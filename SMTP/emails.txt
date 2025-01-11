@@ -1,0 +1,25 @@
+From: forsythe@gmail.com
+To: mustelier@gmail.com
+Subject: Prueba 1
+Date: Thu, 09 Jan 2025 20:30:25 -0500
+
+Probando q funcione 
+
+
+From: mustelier@gmail.com
+To: mustelier@gmail.com
+Subject: Prueba 2
+Date: Fri, 10 Jan 2025 06:05:58 -0500
+
+Probando, la autenticacion y el register solo del   visual sin conexion
+
+Por ahora todo ok.
+
+
+From: mustelier@gmail.com
+To: mustelier@gmail.com
+Subject: Prueba
+Date: Fri, 10 Jan 2025 07:47:41 -0500
+
+Hello 
+
