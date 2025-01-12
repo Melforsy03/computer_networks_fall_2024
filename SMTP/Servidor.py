@@ -10,10 +10,12 @@ HOST = "127.0.0.1"
 PORT = 2525
 EMAIL_REGEX = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
 MAX_EMAIL_SIZE = 52428800  # 50 MB
-
-# Credenciales de usuario para autenticación
-VALID_USERNAME = "user"
-VALID_PASSWORD = "password"
+# Array de usuarios con contraseñas
+USERS = {
+    "user1@gmail.com": "password1",
+    "user2@gmail.com": "password2",
+    "user3@gmail.com": "password3",
+}
 
 # Configuración de fuerza bruta
 MAX_FAILED_ATTEMPTS = 3
@@ -91,38 +93,29 @@ async def handle_client(reader, writer):
                     logging.info("Servidor: 250 OK (EHLO)")
                     await writer.drain()
                     continue
-            elif not authenticated:
+       
+            elif not authenticated_user:
                 if command.upper().startswith("AUTH LOGIN"):
-                    writer.write(b"334 VXNlcm5hbWU6\r\n")  # Base64 de "Username:"
+                    writer.write(b"334 VXNlcm5hbWU6\r\n")
                     await writer.drain()
-                    logging.info("Servidor: 334 VXNlcm5hbWU6 (Username:)")
-                    logs.append("Servidor: 334 VXNlcm5hbWU6 (Username:)")
 
-                    username = (await reader.readline()).decode("utf-8").strip()
-                    writer.write(b"334 UGFzc3dvcmQ6\r\n")  # Base64 de "Password:"
+                    username = base64.b64decode(await reader.readline()).decode("utf-8").strip()
+                    writer.write(b"334 UGFzc3dvcmQ6\r\n")
                     await writer.drain()
-                    logging.info("Servidor: 334 UGFzc3dvcmQ6 (Password:)")
-                    logs.append("Servidor: 334 UGFzc3dvcmQ6 (Password:)")
 
-                    password = (await reader.readline()).decode("utf-8").strip()
-                    if (base64.b64decode(username).decode("utf-8") == VALID_USERNAME and
-                            base64.b64decode(password).decode("utf-8") == VALID_PASSWORD):
-                        authenticated = True
+                    password = base64.b64decode(await reader.readline()).decode("utf-8").strip()
+
+                    if username in USERS and USERS[username] == password:
+                        authenticated_user = username
                         writer.write(b"235 Authentication successful\r\n")
-                        logging.info("Servidor: 235 Authentication successful")
-                        logs.append("Servidor: 235 Authentication successful")
                         await writer.drain()
                         continue
                     else:
                         writer.write(b"535 Authentication failed\r\n")
-                        logging.info("Servidor: 535 Authentication failed")
-                        logs.append("Servidor: 535 Authentication failed")
                         await writer.drain()
                         break
                 else:
                     writer.write(b"530 Authentication required\r\n")
-                    logging.info("Servidor: 530 Authentication required")
-                    logs.append("Servidor: 530 Authentication required")
                     await writer.drain()
                     continue
 
@@ -155,19 +148,43 @@ async def handle_client(reader, writer):
             else:
                 if command.upper().startswith("MAIL FROM:"):
                     mail_from = command[10:].strip()
-                    writer.write(b"250 OK\r\n")
-                    logging.info("Servidor: 250 OK (MAIL FROM)")
-                    logs.append("Servidor: 250 OK (MAIL FROM)")
+                    if mail_from not in USERS:
+                        writer.write(b"550 Sender not recognized\\r\\n")
+                    else:
+                        writer.write(b"250 OK\\r\\n")
                 elif command.upper().startswith("RCPT TO:"):
                     rcpt_to = command[8:].strip()
-                    writer.write(b"250 OK\r\n")
-                    logging.info("Servidor: 250 OK (RCPT TO)")
-                    logs.append("Servidor: 250 OK (RCPT TO)")
+                    if rcpt_to not in USERS:
+                        writer.write(b"550 Recipient not recognized\\r\\n")
+                    else:
+                        writer.write(b"250 OK\\r\\n")
                 elif command.upper() == "DATA":
                     writer.write(b"354 End data with <CR><LF>.<CR><LF>\r\n")
                     logging.info("Servidor: 354 End data with <CR><LF>.<CR><LF>")
                     logs.append("Servidor: 354 End data with <CR><LF>.<CR><LF>")
                     data_mode = True
+                elif command.upper() == "RETRIEVE":
+                    if not authenticated_user:
+                        writer.write(b"530 Authentication required\r\n")
+                    else:
+                        try:
+                            inbox_file = f"{authenticated_user}_inbox.txt"
+                            try:
+                                with open(inbox_file, "r") as f:
+                                    messages = f.readlines()
+                                if not messages:
+                                    writer.write(b"250 No messages found\r\n")
+                                else:
+                                    writer.write(b"250 Messages retrieved:\r\n")
+                                    for message in messages:
+                                        writer.write(message.encode() + b"\r\n")
+                                    writer.write(b".\r\n")  # Finaliza la transmisión
+                            except FileNotFoundError:
+                                writer.write(b"250 No messages found\r\n")
+                        except Exception as e:
+                            logging.error(f"Error al recuperar mensajes: {e}")
+                            writer.write(b"550 Error retrieving messages\r\n")
+                    await writer.drain()
                 elif command.upper() == "QUIT":
                     writer.write(b"221 Bye\r\n")
                     logging.info("Servidor: 221 Bye")
@@ -189,16 +206,14 @@ async def handle_client(reader, writer):
     writer.close()
     await writer.wait_closed()
 
-
 def save_email(mail_from, rcpt_to, email_data):
+    logging.info(f"Guardando correo de {mail_from} para {rcpt_to}.")
     try:
-        with open("emails.txt", "a") as f:
-            #f.write(f"De: {mail_from}\n")
-            #f.write(f"Para: {rcpt_to}\n")
-            f.write(f"\n")
-            f.write(f"{email_data} \n\n")
+        with open(f"{rcpt_to}_inbox.txt", "a") as f:
+            f.write(f"De: {mail_from}\\nPara: {rcpt_to}\\n{email_data}\\n\\n")
     except IOError as e:
         logging.error(f"Error al guardar el correo: {e}")
+
 
 async def start_server():
  # Crear contexto SSL
