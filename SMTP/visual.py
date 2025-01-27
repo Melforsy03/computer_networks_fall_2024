@@ -1,8 +1,8 @@
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QStackedWidget, QVBoxLayout, QWidget, QPushButton, QAbstractScrollArea,
-    QLineEdit, QTextEdit, QLabel, QTableWidget, QTableWidgetItem, QHBoxLayout, QCheckBox
+    QLineEdit, QTextEdit, QLabel, QTableWidget, QTableWidgetItem, QHBoxLayout, QCheckBox, QHeaderView
 )
-from PyQt6 import QtCore
+from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QTableWidgetItem
@@ -187,17 +187,24 @@ class SMTPClientUI(QMainWindow):
         self.inbox_table = QTableWidget()
         self.inbox_table.setColumnCount(4) 
         self.inbox_table.setHorizontalHeaderLabels(["De", "Asunto", "Fecha", "Mensaje"])
+        
+        header = self.inbox_table.horizontalHeader()
+        header.setStyleSheet("background-color: black; color: white; font-weight: bold;")
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
 
+        self.inbox_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self.inbox_table.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
         self.inbox_table.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustToContents)
-
+        layout.addWidget(self.inbox_table)
+        
         # Cambiar el tamaño de las columnas
         self.inbox_table.setColumnWidth(0, 200)  
         self.inbox_table.setColumnWidth(1, 250)  
         self.inbox_table.setColumnWidth(2, 150) 
-        self.inbox_table.setColumnWidth(3, 630)  
+        #self.inbox_table.setColumnWidth(3, 630)  
         
-        self.inbox_table.setRowCount(0)
-        layout.addWidget(self.inbox_table)
+        # self.inbox_table.setRowCount(0)
+        # layout.addWidget(self.inbox_table)
        
         # Botones centrados
         button_layout = QHBoxLayout()
@@ -344,7 +351,7 @@ class SMTPClientUI(QMainWindow):
                     
                     # **Cálculo del tamaño de la fila basado en las líneas del mensaje**
                     num_lines = len(body.splitlines()) 
-                    row_height = max(30, num_lines * 35) 
+                    row_height = max(30, num_lines * 70) 
                     time.sleep(0.5)
                     self.inbox_table.setRowHeight(index, row_height) 
                     

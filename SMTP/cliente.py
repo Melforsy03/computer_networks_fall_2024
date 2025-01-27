@@ -8,7 +8,7 @@ import re
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-SMTP_SERVER = "172.21.112.1"
+SMTP_SERVER = "127.0.0.1"
 SMTP_PORT = 2525
 
 def load_key():

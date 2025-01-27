@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import ssl
 from aiohttp import web
 
-HOST = "0.0.0.0"
+HOST = "127.0.0.1"
 PORT = 2525
 EMAIL_REGEX = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
 MAX_EMAIL_SIZE = 52428800  # 50 MB
