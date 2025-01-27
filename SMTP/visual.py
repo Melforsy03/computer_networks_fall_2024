@@ -1,349 +1,385 @@
-from kivy.lang import Builder
-from kivymd.app import MDApp
-from kivymd.uix.button import MDRaisedButton
-from kivymd.uix.textfield import MDTextField
-from kivymd.uix.label import MDLabel
-from kivymd.uix.boxlayout import BoxLayout
-from kivymd.uix.spinner import MDSpinner
-from kivymd.toast import toast
-from kivymd.uix.datatables import MDDataTable
-from kivy.uix.scrollview import ScrollView  # Importar ScrollView si no está importado
-from kivymd.uix.dialog import MDDialog
-from kivy.uix.scrollview import ScrollView
-from kivymd.uix.card import MDCard
-from kivy.metrics import dp
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QStackedWidget, QVBoxLayout, QWidget, QPushButton, QAbstractScrollArea,
+    QLineEdit, QTextEdit, QLabel, QTableWidget, QTableWidgetItem, QHBoxLayout, QCheckBox
+)
+from PyQt6 import QtCore
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import QTableWidgetItem
+
+import sys
+import re, time
 import asyncio
-import re
-from cliente import send_email
-from Servidor import read_emails_from_file
 import threading
-from Servidor import start_server
+from cliente import authentication, send_email, retrieve_messages
 
-EMAIL_REGEX = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-# Almacenamiento de usuarios (esto puede estar en un archivo o base de datos)
-USER_DATA = {}
+class SMTPClientUI(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Cliente SMTP")
+        self.setGeometry(100, 100, 1000, 800)  # Se ajusta el tamaño de la ventana
 
-# Layout de la ventana principal
-class MainWindow(BoxLayout):
-    def __init__(self, app, **kwargs):
-        super().__init__(**kwargs)
-        self.orientation = 'vertical'
-        self.spacing = 10
-        self.padding = 20
-        self.app = app
+        self.stacked_widget = QStackedWidget()
+        self.setCentralWidget(self.stacked_widget)
 
-        # Título
-        self.add_widget(MDLabel(text="Bienvenido a SMTP",
-                                halign="center",
-                                font_style="H3",
-                                size_hint=(1, 0.2)))
+        # Estilo general
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #000000; /* Fondo negro */
+            }
+            QWidget {
+                background-color: #000000; /* Fondo negro */
+                color: white;
+            }
+            QPushButton {
+                background-color: #4b0082; /* Botones morado oscuro */
+                color: white;
+                border: 1px solid #4b0082;
+                border-radius: 3px;
+                padding: 5px; /* Botones estilizados */
+                font-size: 14px;
+                min-width: 200px; /* Ancho mínimo */
+                max-width: 200px; /* Ancho fijo */
+            }
+            QPushButton:hover {
+                background-color: #660099; /* Cambio de color al pasar el mouse */
+            }
+            QLabel {
+                color: white;
+                font-size: 16px; /* Tamaño de texto */
+            }
+            QLineEdit, QTextEdit {
+                background-color: #000000; /* Fondo negro */
+                color: white;
+                border: 1px solid #660099; /* Borde morado oscuro */
+                border-radius: 3px;
+                padding: 10px; /* Márgenes */
+                font-size: 16px; /* Aumento de tamaño de fuente */
+            }
+            QTableWidget {
+                background-color: #000000; /* Fondo negro */
+                color: white;
+                border: 1px solid #660099; /* Borde morado oscuro */
+            }
+            QTableWidget::item {
+                border: 1px solid #660099; /* Borde morado oscuro */
+            }
+        """)
 
-        # Botones para Cliente y Servidor
-        self.add_widget(MDRaisedButton(text="Envío de correos",
-                                        size_hint=(None, None),
-                                        size=("200dp", "50dp"),
-                                        pos_hint={"center_x": 0.5},
-                                        on_press=self.app.show_client_interface))
+        self.create_login_screen()
+        self.create_menu_screen()
+        self.create_send_email_screen()
+        self.create_inbox_screen()
 
-        self.add_widget(MDRaisedButton(text="Correos recibidos",
-                                        size_hint=(None, None),
-                                        size=("200dp", "50dp"),
-                                        pos_hint={"center_x": 0.5},
-                                        on_press=self.app.show_server_interface))
+        self.stacked_widget.setCurrentWidget(self.login_screen)
 
-class LoginWindow(BoxLayout):
-    def __init__(self, app, **kwargs):
-        super().__init__(**kwargs)
-        self.orientation = 'vertical'
-        self.spacing = 10
-        self.padding = 30
-        self.app = app
+    def create_login_screen(self):
+        self.login_screen = QWidget()
+        layout = QVBoxLayout()
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.add_widget(MDLabel(text="Login", halign="center", font_style="H4", size_hint=(1, 0.1)))
+        login_label = QLabel("Inicio de sesión")
+        login_label.setFont(QFont("Roboto", 20, QFont.Weight.Bold))
+        layout.addWidget(login_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        self.email_input = MDTextField(hint_text="Introduce tu correo", size_hint=(1, None), height="40dp")
-        self.add_widget(self._build_labeled_field("Correo:", self.email_input))
+        self.email_input = QLineEdit()
+        self.email_input.setPlaceholderText("Correo electrónico")
+        self.email_input.setMinimumWidth(400)  
+        layout.addWidget(self.email_input, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        self.password_input = MDTextField(hint_text="Introduce tu contraseña", size_hint=(1, None), height="40dp", password=True)
-        self.add_widget(self._build_labeled_field("Contraseña:", self.password_input))
+        self.password_input = QLineEdit()
+        self.password_input.setPlaceholderText("Contraseña")
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.password_input.setMinimumWidth(400)
+        layout.addWidget(self.password_input, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        self.login_button = MDRaisedButton(text="Iniciar Sesión", size_hint=(None, None), size=("200dp", "50dp"), pos_hint={"center_x": 0.5}, on_press=self.login)
-        self.add_widget(self.login_button)
+        # Opción para ver la contraseña
+        self.show_password_checkbox = QCheckBox("Mostrar contraseña")
+        self.show_password_checkbox.setStyleSheet("color: white;")
+        self.show_password_checkbox.stateChanged.connect(self.toggle_password_visibility)
+        layout.addWidget(self.show_password_checkbox, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        self.register_button = MDRaisedButton(text="Registrar", size_hint=(None, None), size=("200dp", "50dp"), pos_hint={"center_x": 0.5}, on_press=self.app.show_register_interface)
-        self.add_widget(self.register_button)
+        self.login_message = QLabel("")
+        layout.addWidget(self.login_message, alignment=Qt.AlignmentFlag.AlignCenter)
 
-    def _build_labeled_field(self, label_text, input_field):
-        layout = BoxLayout(orientation="vertical", size_hint=(1, None), height="100dp")
-        layout.add_widget(MDLabel(text=label_text, halign="left"))
-        layout.add_widget(input_field)
-        return layout
+        login_button = QPushButton("Iniciar sesión")
+        login_button.clicked.connect(self.login)
+        layout.addWidget(login_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-    def login(self, instance):
-        email = self.email_input.text
-        password = self.password_input.text
+        self.login_screen.setLayout(layout)
+        self.stacked_widget.addWidget(self.login_screen)
 
-        if email not in USER_DATA or USER_DATA[email] != password:
-            toast("Credenciales incorrectas.")
-            return
+    def create_menu_screen(self):
+        self.menu_screen = QWidget()
+        layout = QVBoxLayout()
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Guardar las credenciales en la aplicación
-        self.app.set_user_credentials(email, password)
+        menu_label = QLabel("Menú Principal")
+        menu_label.setFont(QFont("Roboto", 20, QFont.Weight.Bold))
+        layout.addWidget(menu_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        toast("Login exitoso.")
-        self.app.show_main_interface()
+        send_email_button = QPushButton("Enviar correo")
+        send_email_button.clicked.connect(self.clean_and_go_to_send_email)
+        layout.addWidget(send_email_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
+        inbox_button = QPushButton("Bandeja de entrada")
+        inbox_button.clicked.connect(self.clean_and_go_to_inbox)
+        layout.addWidget(inbox_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-class RegisterWindow(BoxLayout):
-    def __init__(self, app, **kwargs):
-        super().__init__(**kwargs)
-        self.orientation = 'vertical'
-        self.spacing = 10
-        self.padding = 30
-        self.app = app
+        logout_button = QPushButton("Cerrar sesión")
+        logout_button.clicked.connect(self.clean_and_go_to_login)
+        layout.addWidget(logout_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        self.add_widget(MDLabel(text="Registro", halign="center", font_style="H4", size_hint=(1, 0.1)))
+        self.menu_screen.setLayout(layout)
+        self.stacked_widget.addWidget(self.menu_screen)
 
-        self.email_input = MDTextField(hint_text="Introduce tu correo", size_hint=(1, None), height="40dp")
-        self.add_widget(self._build_labeled_field("Correo:", self.email_input))
+    def create_send_email_screen(self):
+        self.send_email_screen = QWidget()
+        layout = QVBoxLayout()
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)  # Alineación hacia arriba
 
-        self.password_input = MDTextField(hint_text="Introduce tu contraseña", size_hint=(1, None), height="40dp", password=True)
-        self.add_widget(self._build_labeled_field("Contraseña:", self.password_input))
+        send_label = QLabel("Enviar correo")
+        send_label.setFont(QFont("Arial", 20, QFont.Weight.Bold))
+        layout.addWidget(send_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        self.confirm_password_input = MDTextField(hint_text="Confirma tu contraseña", size_hint=(1, None), height="40dp", password=True)
-        self.add_widget(self._build_labeled_field("Confirmar Contraseña:", self.confirm_password_input))
+        self.recipient_input = QLineEdit()
+        self.recipient_input.setPlaceholderText("Destinatario")
+        layout.addWidget(self.recipient_input)
 
-        self.register_button = MDRaisedButton(text="Registrar", size_hint=(None, None), size=("200dp", "50dp"), pos_hint={"center_x": 0.5}, on_press=self.register)
-        self.add_widget(self.register_button)
+        self.subject_input = QLineEdit()
+        self.subject_input.setPlaceholderText("Asunto")
+        layout.addWidget(self.subject_input)
 
-        self.login_button = MDRaisedButton(text="Volver al Login", size_hint=(None, None), size=("200dp", "50dp"), pos_hint={"center_x": 0.5}, on_press=self.app.show_login_interface)
-        self.add_widget(self.login_button)
+        self.body_input = QTextEdit()
+        self.body_input.setPlaceholderText("Cuerpo del mensaje")
+        self.body_input.setMinimumHeight(300)  
+        layout.addWidget(self.body_input)
 
-    def _build_labeled_field(self, label_text, input_field):
-        layout = BoxLayout(orientation="vertical", size_hint=(1, None), height="100dp")
-        layout.add_widget(MDLabel(text=label_text, halign="left"))
-        layout.add_widget(input_field)
-        return layout
+        self.send_message = QLabel("")
+        layout.addWidget(self.send_message)
 
-    def register(self, instance):
-        email = self.email_input.text
-        password = self.password_input.text
-        confirm_password = self.confirm_password_input.text
+        # Botones centrados
+        button_layout = QHBoxLayout()
+        send_button = QPushButton("Enviar")
+        send_button.clicked.connect(self.send_email)
+        button_layout.addWidget(send_button)
 
-        if email in USER_DATA:
-            toast("El correo ya está registrado.")
-            return
+        back_button = QPushButton("Volver")
+        back_button.clicked.connect(lambda: self.stacked_widget.setCurrentWidget(self.menu_screen))
+        button_layout.addWidget(back_button)
 
-        if password != confirm_password:
-            toast("Las contraseñas no coinciden.")
-            return
+        button_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Centramos los botones
+        layout.addLayout(button_layout)
 
-        USER_DATA[email] = password
-        toast("Registro exitoso.")
-        self.app.show_login_interface()
+        self.send_email_screen.setLayout(layout)
+        self.stacked_widget.addWidget(self.send_email_screen)
 
-class ClientWindow(BoxLayout):
-    def __init__(self, app, **kwargs):
-        super().__init__(**kwargs)
-        self.orientation = 'vertical'
-        self.spacing = 10
-        self.padding = 30
-        self.app = app
-        self.spinner = None  # Agregar una referencia al spinner
+    def create_inbox_screen(self):
+        self.inbox_screen = QWidget()
+        layout = QVBoxLayout()
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop) 
 
-        # Título
-        self.add_widget(MDLabel(text="Enviar Correo",
-                                halign="center",
-                                font_style="H4",
-                                size_hint=(1, 0.1)))
+        inbox_label = QLabel("Bandeja de entrada")
+        inbox_label.setFont(QFont("Arial", 20, QFont.Weight.Bold))
+        layout.addWidget(inbox_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Remitente
-        self.sender_input = MDTextField(hint_text="Introduce el remitente", size_hint=(1, None), height="40dp")
-        self.add_widget(self._build_labeled_field("Remitente:", self.sender_input))
+        # columna
+        self.inbox_table = QTableWidget()
+        self.inbox_table.setColumnCount(4) 
+        self.inbox_table.setHorizontalHeaderLabels(["De", "Asunto", "Fecha", "Mensaje"])
 
-        # Destinatario
-        self.recipient_input = MDTextField(hint_text="Introduce el destinatario", size_hint=(1, None), height="40dp")
-        self.add_widget(self._build_labeled_field("Destinatario:", self.recipient_input))
+        self.inbox_table.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustToContents)
 
-        # Asunto
-        self.subject_input = MDTextField(hint_text="Introduce el asunto", size_hint=(1, None), height="40dp")
-        self.add_widget(self._build_labeled_field("Asunto:", self.subject_input))
-
-        # Mensaje
-        self.message_input = MDTextField(hint_text="Introduce tu mensaje", multiline=True, size_hint=(1, None), height="200dp")
-        message_scroll = ScrollView(size_hint=(1, None), height="60dp")  # Ajustar el tamaño del ScrollView
-        message_scroll.add_widget(self.message_input)
-        self.add_widget(self._build_labeled_field("Mensaje:", message_scroll))
-
-        # Botón Enviar
-        self.send_button = MDRaisedButton(text="Enviar",
-                                          size_hint=(None, None),
-                                          size=("200dp", "50dp"),
-                                          pos_hint={"center_x": 0.5},
-                                          on_press=self.send_message)
-        self.add_widget(self.send_button)
-
-        # Botón Volver
-        self.add_widget(MDRaisedButton(text="Volver",
-                                       size_hint=(None, None),
-                                       size=("200dp", "50dp"),
-                                       pos_hint={"center_x": 0.5},
-                                       on_press=self.app.show_main_interface))
-
-    def _build_labeled_field(self, label_text, input_field):
-        layout = BoxLayout(orientation="vertical", size_hint=(1, None), height="100dp")
-        layout.add_widget(MDLabel(text=label_text, halign="left"))
-        layout.add_widget(input_field)
-        return layout
-
-    async def send_message_async(self, sender, recipient, subject, message):
-        try:
-            # Usar las credenciales del usuario almacenadas en la app
-            username = self.app.username
-            password = self.app.password
-
-            # Enviar correo utilizando las credenciales del usuario
-            await send_email(username, password, sender, recipient, subject, message)
-            toast("Correo enviado correctamente.")  # Usamos el toast aquí
-            self.app.show_main_interface()
-        except Exception as e:
-            toast(f"Error: {str(e)}")  # Usamos el toast aquí
-        finally:
-            # Eliminar el spinner después de que termine el proceso
-            if self.spinner:
-                self.remove_widget(self.spinner)
-                self.spinner = None
-
-    def send_message(self, instance):
-        sender = self.sender_input.text
-        recipient = self.recipient_input.text
-        subject = self.subject_input.text
-        message = self.message_input.text
-
-        # Validaciones
-        if not all([sender, recipient, subject, message]):
-            toast("Todos los campos deben estar completos.")  # Usamos el toast aquí
-            return
-
-        if not re.match(EMAIL_REGEX, sender):
-            toast("El remitente no tiene un formato válido.")  # Usamos el toast aquí
-            return
-
-        if not re.match(EMAIL_REGEX, recipient):
-            toast("El destinatario no tiene un formato válido.")  # Usamos el toast aquí
-            return
-
-        # Spinner de carga (solo uno)
-        if not self.spinner:
-            self.spinner = MDSpinner(size_hint=(None, None), size=("48dp", "48dp"), pos_hint={"center_x": 0.5, "center_y": 0.5})
-            self.add_widget(self.spinner)
-
-        # Ejecutar la tarea asincrónica correctamente
-        asyncio.run(self.send_message_async(sender, recipient, subject, message))
-
-
-class ServerWindow(BoxLayout):
-    def __init__(self, app, **kwargs):
-        super().__init__(**kwargs)
-        self.orientation = 'vertical'
-        self.spacing = 10
-        self.padding = (30, 20, 30, 0)
-        self.app = app
-
-        # Título
-        self.add_widget(MDLabel(text="Bandeja de Correos",
-                                halign="center",
-                                theme_text_color="Custom",
-                                text_color=(1, 1, 1, 1),
-                                font_style="H4",
-                                size_hint=(1, 0.5)))
-
-        # Scroll para mensajes
-        self.messages_list = ScrollView(size_hint=(1, 1), height=300)
-        self.messages_box = BoxLayout(orientation="vertical", size_hint_y=None, spacing=10)
-        self.messages_box.bind(minimum_height=self.messages_box.setter('height'))
-
-        # Leer los correos desde el archivo y mostrarlos
-        emails = read_emails_from_file() 
+        # Cambiar el tamaño de las columnas
+        self.inbox_table.setColumnWidth(0, 200)  
+        self.inbox_table.setColumnWidth(1, 250)  
+        self.inbox_table.setColumnWidth(2, 150) 
+        self.inbox_table.setColumnWidth(3, 630)  
         
-        for email in emails:
-            message = MDCard(
-                size_hint=(0.6, None),
-                padding=10,
-                pos_hint={"x": 0.05},
-                adaptive_height=True,
-            )
-            message.add_widget(MDLabel(
-                text=email,
-                halign="left",
-                theme_text_color="Secondary",
-                size_hint_y=None,
-                valign="top",
-                adaptive_height=True,
-            ))
-            self.messages_box.add_widget(message)
+        self.inbox_table.setRowCount(0)
+        layout.addWidget(self.inbox_table)
+       
+        # Botones centrados
+        button_layout = QHBoxLayout()
+        retrieve_button = QPushButton("Recuperar mensajes")
+        retrieve_button.clicked.connect(self.retrieve_messages)
+        button_layout.addWidget(retrieve_button)
 
-        self.messages_list.add_widget(self.messages_box)
-        self.add_widget(self.messages_list)
+        back_button = QPushButton("Volver")
+        back_button.clicked.connect(lambda: self.stacked_widget.setCurrentWidget(self.menu_screen))
+        button_layout.addWidget(back_button)
 
-        # Botón Volver
-        self.back_button = MDRaisedButton(text="Volver",
-                                          size_hint=(None, None),
-                                          size=("200dp", "50dp"),
-                                          pos_hint={"center_x": 0.5},
-                                          on_press=self.app.show_main_interface)
-        self.add_widget(self.back_button)
+        button_layout.setAlignment(Qt.AlignmentFlag.AlignCenter) 
+        layout.addLayout(button_layout)
 
-# Clase principal de la aplicación
-class SMTPApp(MDApp):
-    def build(self):
-        # Configurar el tema con fondo oscuro y color morado
-        self.theme_cls.primary_palette = "Purple"  
-        self.theme_cls.primary_hue = "500" 
-        self.theme_cls.theme_style = "Dark" 
-        self.theme_cls.accent_palette = "Purple"  
-        self.theme_cls.accent_hue = "500" 
+        self.inbox_screen.setLayout(layout)
+        self.stacked_widget.addWidget(self.inbox_screen)
+
+    def clean_and_go_to_login(self):
+        self.email_input.clear()
+        self.password_input.clear()
+        self.login_message.setText("")
+        self.stacked_widget.setCurrentWidget(self.login_screen)
+
+    def clean_and_go_to_send_email(self):
+        self.recipient_input.clear()
+        self.subject_input.clear()
+        self.body_input.clear()
+        self.send_message.setText("")
+        self.stacked_widget.setCurrentWidget(self.send_email_screen)
+
+    def clean_and_go_to_inbox(self):
+        self.inbox_table.setRowCount(0)  # Limpia la tabla
+        self.stacked_widget.setCurrentWidget(self.inbox_screen)
+
+    def login(self):
+        email = self.email_input.text()
+        password = self.password_input.text()
+        self.login_message.setText("")
         
-        self.username = None
-        self.password = None
-        self.main_window = LoginWindow(self)
-        return self.main_window
+        # Validación de campos vacíos
+        if not email or not password:
+            self.login_message.setText("Por favor, completa todos los campos.")
+            return
+        
+        def auth_task():
+            try:
+                self.login_message.setText("")
+                result = asyncio.run(authentication(email, password))
+            
+                if result:
+                    self.login_message.setText("Inicio de sesión exitoso.")
+                    self.stacked_widget.setCurrentWidget(self.menu_screen)
+                else:
+                    self.login_message.setText("Usuario o contraseña incorrectos. Por favor, inténtalo de nuevo.")
+            except Exception as e:
+                    self.login_message.setText(f"Error: {e}")
+
+        thread = threading.Thread(target=auth_task)
+        thread.start()
+
+    def send_email(self):
+        sender = self.email_input.text()
+        password = self.password_input.text()
+        recipient = self.recipient_input.text()
+        subject = self.subject_input.text()
+        body = self.body_input.toPlainText()
+        self.login_message.setText("")
+        
+        # Validación de campos vacíos
+        if not recipient or not subject or not body:
+            self.send_message.setText("Por favor, completa todos los campos antes de enviar el correo.")
+            return
     
-    def set_user_credentials(self, username, password):
-        """Guardar las credenciales del usuario."""
-        self.username = username
-        self.password = password
+        def send_task():
+            try:
+                self.login_message.setText("")
+                result = asyncio.run(send_email(sender, password, recipient, subject, body))
+                
+                if result:
+                    self.send_message.setText("Correo enviado exitosamente.")
+                else:
+                    self.send_message.setText("El destinatario no existe. Por favor, inténtalo de nuevo.")
+            except Exception as e:
+                self.send_message.setText(f"Error: {e}")
+
+        thread = threading.Thread(target=send_task)
+        thread.start()
+
+    def retrieve_messages(self):
+        sender = self.email_input.text()
+        password = self.password_input.text()
+
+        def retrieve_task():
+            try:
+                messages = asyncio.run(retrieve_messages(sender, password))
+                print(f"Mensajes procesados en lista: {messages}")
+                text = ''.join(messages)
+                print(f"Unión de los SMS: {text}")
+
+                # Usar una expresión regular para encontrar los bloques de correos
+                pattern = r'(De:.*?)(?=De:|$)'
+                emails = re.findall(pattern, text, re.DOTALL)
+
+                # Limpiar la tabla antes de agregar nuevos mensajes
+                self.inbox_table.setRowCount(0)
+
+                # Procesar cada correo encontrado
+                for index, email in enumerate(emails):
+                    email = email.strip()  # Eliminar espacios en blanco al principio y al final
+                    lines = email.split('\n')
+
+                    from_address = ""
+                    subject = ""
+                    date = ""
+                    body = ""
+                    found_body = False
+
+                    for line in lines:
+                        if line.startswith("De:"):
+                            from_address = line.replace("De:", "").strip()
+                        elif line.startswith("Asunto:"):
+                            subject = line.replace("Asunto:", "").strip()
+                        elif line.startswith("Fecha:"):
+                            date = line.replace("Fecha:", "").strip()
+                        elif line.startswith("Para:"):  # Ignorar la línea que empieza con "Para:"
+                            continue
+                        elif line.strip() == "":
+                            found_body = True
+                        elif found_body:
+                            body += line + "\n"
+
+                    # Limpiar el cuerpo de posibles espacios en blanco al final
+                    body = body.strip()
+                    
+                    # Insertar en la tabla
+                    self.inbox_table.insertRow(index)
+                    self.inbox_table.setItem(index, 0, QTableWidgetItem(from_address))
+                    self.inbox_table.setItem(index, 1, QTableWidgetItem(subject))
+                    self.inbox_table.setItem(index, 2, QTableWidgetItem(date))
+                    
+                    body_item = QTableWidgetItem(body)
+                    body_item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
+                    self.inbox_table.setItem(index, 3, body_item)
+                    
+                    # **Cálculo del tamaño de la fila basado en las líneas del mensaje**
+                    num_lines = len(body.splitlines()) 
+                    row_height = max(30, num_lines * 35) 
+                    time.sleep(0.5)
+                    self.inbox_table.setRowHeight(index, row_height) 
+                    
+                    # Deshabilitar la edición de las celdas (solo lectura)
+                    for col in range(self.inbox_table.columnCount()):
+                        self.inbox_table.item(index, col).setFlags(
+                            self.inbox_table.item(index, col).flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable
+                        )
+                    
+                    print("Número de filas en la tabla:", self.inbox_table.rowCount())
+                    for row in range(self.inbox_table.rowCount()):
+                        print(f"Altura de la fila {row}: {self.inbox_table.rowHeight(row)}")
         
-    def show_login_interface(self, *args):
-        self.root.clear_widgets()
-        self.root.add_widget(LoginWindow(self))
+            except Exception as e:
+                self.inbox_table.setRowCount(0)
+                self.inbox_table.insertRow(0)
+                self.inbox_table.setItem(0, 0, QTableWidgetItem("Error"))
+                self.inbox_table.setItem(0, 1, QTableWidgetItem("-"))
+                self.inbox_table.setItem(0, 2, QTableWidgetItem("-"))
+                self.inbox_table.setItem(0, 3, QTableWidgetItem(str(e)))
+    
+        thread = threading.Thread(target=retrieve_task)
+        thread.start()
 
-    def show_register_interface(self, *args):
-        self.root.clear_widgets()
-        self.root.add_widget(RegisterWindow(self))
-
-    def show_main_interface(self, *args):
-        self.root.clear_widgets()
-        self.root.add_widget(MainWindow(self))
-
-    def show_client_interface(self, *args):
-        self.root.clear_widgets()
-        self.root.add_widget(ClientWindow(self))
-
-    def show_server_interface(self, *args):
-        self.root.clear_widgets()
-        self.root.add_widget(ServerWindow(self))
-
-    def start_server_thread(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(start_server())
-
-    def on_start(self):
-        # Iniciar el servidor en un hilo separado
-        server_thread = threading.Thread(target=self.start_server_thread)
-        server_thread.start()
+    def toggle_password_visibility(self, state):
+        if self.show_password_checkbox.isChecked():  
+            self.password_input.setEchoMode(QLineEdit.EchoMode.Normal)
+            print("Mostrar contraseña")
+        else:
+            self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+            print("Ocultar contraseña")
 
 
 if __name__ == "__main__":
-    SMTPApp().run()
+    app = QApplication(sys.argv)
+    window = SMTPClientUI()
+    window.show()
+    sys.exit(app.exec())

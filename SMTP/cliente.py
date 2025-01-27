@@ -4,8 +4,8 @@ from cryptography.fernet import Fernet
 import ssl
 from email.utils import formatdate
 import logging
+import re
 
-# Configurar logs
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 SMTP_SERVER = "127.0.0.1"
@@ -19,115 +19,213 @@ def load_key():
 cipher_suite = Fernet(load_key())
 
 def validate_email(email):
-    logging.debug(f"Validando dirección de correo: {email}")
-    pass  # Validación desactivada para pruebas
+    email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+    if not re.match(email_regex, email):
+        raise ValueError(f"Dirección de correo inválida: {email}")
 
 async def read_response(reader):
-    # Leer la respuesta del servidor SMTP
     response = await reader.read(1024)
-    response_decoded = response.decode()
-    logging.debug(f"Respuesta del servidor: {response_decoded.strip()}")
-
-    if not (response_decoded.startswith("2") or response_decoded.startswith("3") or response_decoded.startswith("5")):
-        logging.error(f"Error del servidor: {response_decoded.strip()}")
+    response_decoded = response.decode().strip()
+    logging.debug(f"Respuesta del servidor: {response_decoded}")
+    if not (response_decoded.startswith("2") or response_decoded.startswith("3")):
         raise Exception(f"Error del servidor: {response_decoded}")
-    
     return response_decoded
 
-# Elimina las líneas donde defines USERNAME y PASSWORD de forma fija
-# USERNAME = "user"
-# PASSWORD = "password"
+async def authentication(sender, password):
+    logging.info("Iniciando autenticacion.")
+    validate_email(sender)
 
-# Nueva función que recibirá los valores de USERNAME y PASSWORD como parámetros
-async def send_email(sender, recipient, subject, message, username, password):
-    logging.info("Iniciando envío de correo con credenciales externas.")
+    ssl_context = ssl.create_default_context()
+    ssl_context.load_verify_locations("server.crt")
+    
+    reader, writer = None, None
+    Bool = False
+
+    try:
+        reader, writer = await asyncio.open_connection(SMTP_SERVER, SMTP_PORT, ssl=ssl_context)
+        await read_response(reader)
+
+        writer.write(b"EHLO localhost\r\n")
+        await writer.drain()
+        await read_response(reader)
+
+        writer.write(b"AUTH LOGIN\r\n")
+        await writer.drain()
+        await read_response(reader)
+
+        writer.write(base64.b64encode(sender.encode()) + b"\r\n")
+        await writer.drain()
+        await read_response(reader)
+
+        writer.write(base64.b64encode(password.encode()) + b"\r\n")
+        await writer.drain()
+        await read_response(reader)
+
+        writer.write(b"QUIT\r\n")
+        await writer.drain()
+        await read_response(reader)
+
+        logging.info("Se autentico correctamente.")
+        Bool = True
+
+    except Exception as e:
+        logging.error(f"Error al autenticar: {e}")
+    
+    finally:
+        if writer:
+            writer.close()
+            await writer.wait_closed()
+        return Bool
+        
+async def send_email(sender, password, recipient, subject, message):
+    logging.info("Iniciando envío de correo.")
     validate_email(sender)
     validate_email(recipient)
 
-    # Construir el mensaje
-    logging.debug("Construyendo el mensaje.")
-    headers = f"From: {sender}\nTo: {recipient}\nSubject: {subject}\nDate: {formatdate(localtime=True)}\n"
+    headers = f"De: {sender}\nPara: {recipient}\nAsunto: {subject}\nFecha: {formatdate(localtime=True)}\n"
     full_message = headers + "\n" + message
 
-    # Cifrar el mensaje
-    logging.debug("Cifrando el mensaje.")
     encrypted_message = cipher_suite.encrypt(full_message.encode())
 
     ssl_context = ssl.create_default_context()
     ssl_context.load_verify_locations("server.crt")
     
     reader, writer = None, None
+    Bool = False
 
     try:
-        # Abrir conexión
-        logging.info(f"Conectando al servidor SMTP en {SMTP_SERVER}:{SMTP_PORT}.")
         reader, writer = await asyncio.open_connection(SMTP_SERVER, SMTP_PORT, ssl=ssl_context)
-
-        # Leer bienvenida del servidor
         await read_response(reader)
 
-        # EHLO
-        logging.info("Enviando comando EHLO.")
-        writer.write(b"EHLO\r\n")
+        writer.write(b"EHLO localhost\r\n")
         await writer.drain()
         await read_response(reader)
 
-        # AUTH LOGIN
-        logging.info("Iniciando autenticación.")
         writer.write(b"AUTH LOGIN\r\n")
         await writer.drain()
         await read_response(reader)
 
-        # Enviar nombre de usuario (pasando el username desde la función externa)
-        logging.debug("Enviando nombre de usuario.")
-        writer.write(base64.b64encode(username.encode()) + b"\r\n")
+        writer.write(base64.b64encode(sender.encode()) + b"\r\n")
         await writer.drain()
         await read_response(reader)
 
-        # Enviar contraseña (pasando el password desde la función externa)
-        logging.debug("Enviando contraseña.")
         writer.write(base64.b64encode(password.encode()) + b"\r\n")
         await writer.drain()
         await read_response(reader)
 
-        # MAIL FROM
-        logging.info(f"Enviando comando MAIL FROM para: {sender}.")
-        writer.write(f"MAIL FROM:<{sender}>\r\n".encode())
+        writer.write(f"MAIL FROM:{sender}\r\n".encode())
         await writer.drain()
         await read_response(reader)
 
-        # RCPT TO
-        logging.info(f"Enviando comando RCPT TO para: {recipient}.")
-        writer.write(f"RCPT TO:<{recipient}>\r\n".encode())
+        writer.write(f"RCPT TO:{recipient}\r\n".encode())
         await writer.drain()
         await read_response(reader)
 
-        # DATA
-        logging.info("Enviando comando DATA.")
         writer.write(b"DATA\r\n")
         await writer.drain()
         await read_response(reader)
 
-        # Enviar mensaje cifrado
-        logging.info("Enviando el mensaje cifrado.")
         writer.write(encrypted_message + b"\r\n.\r\n")
         await writer.drain()
         await read_response(reader)
 
-        # QUIT
-        logging.info("Enviando comando QUIT.")
         writer.write(b"QUIT\r\n")
         await writer.drain()
         await read_response(reader)
 
         logging.info("Correo enviado correctamente.")
+        Bool = True
 
     except Exception as e:
         logging.error(f"Error al enviar el correo: {e}")
     
     finally:
         if writer:
-            logging.info("Cerrando la conexión con el servidor.")
             writer.close()
             await writer.wait_closed()
+        return Bool
 
+async def retrieve_messages(sender, password):
+    logging.info("Conectando para recuperar mensajes.")
+    ssl_context = ssl.create_default_context()
+    ssl_context.load_verify_locations("server.crt")
+
+    reader, writer = None, None
+    messages = [] 
+
+    try:
+        reader, writer = await asyncio.open_connection(SMTP_SERVER, SMTP_PORT, ssl=ssl_context)
+        await read_response(reader)
+
+        writer.write(b"EHLO localhost\r\n")
+        await writer.drain()
+        await read_response(reader)
+
+        writer.write(b"AUTH LOGIN\r\n")
+        await writer.drain()
+        await read_response(reader)
+
+        writer.write(base64.b64encode(sender.encode()) + b"\r\n")
+        await writer.drain()
+        await read_response(reader)
+
+        writer.write(base64.b64encode(password.encode()) + b"\r\n")
+        await writer.drain()
+        await read_response(reader)
+
+        logging.debug("Iniciando comando RETRIEVE.")
+        writer.write(b"RETRIEVE\r\n")
+        await writer.drain()
+
+        response = b""
+        while True:
+            try:
+                chunk = await asyncio.wait_for(reader.read(1024), timeout=5)  
+                if not chunk:  
+                    break
+                response += chunk
+
+                if response.endswith(b"\r\n.\r\n"):
+                    break
+
+            except asyncio.TimeoutError:
+                logging.warning("Timeout al esperar más datos del servidor.")
+                break
+
+        try:
+            response_decoded = response.decode(errors='replace')
+            logging.info(f"Mensajes recibidos:\n{response_decoded}")
+            
+            raw_messages = response_decoded.split("\r\n.\r\n")
+            
+            for raw_message in raw_messages:
+                if raw_message.strip():  # Ignorar bloques vacíos
+                    messages.append(raw_message.strip())
+            
+        except Exception as decode_error:
+            logging.error(f"Error al decodificar los mensajes: {decode_error}")
+            raise
+
+        writer.write(b"QUIT\r\n")
+        await writer.drain()
+        await read_response(reader)
+
+    except Exception as e:
+        logging.error(f"Error al recuperar mensajes cliente: {e}")
+    
+    finally:
+        if writer:
+            try:
+                logging.info("Cerrando la conexión.")
+                writer.close()
+                await writer.wait_closed()
+            except Exception as close_error:
+                logging.warning(f"Error al cerrar la conexión: {close_error}")
+
+    return messages
+
+if __name__ == "__main__":
+    sender = "user2@gmail.com"  
+    recipient = "user1@gmail.com"
+    subject = "Asunto de prueba 2"
+    message = "Este es un mensaje de prueba, para ver si coge sms."

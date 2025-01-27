@@ -10,6 +10,7 @@ HOST = "127.0.0.1"
 PORT = 2525
 EMAIL_REGEX = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
 MAX_EMAIL_SIZE = 52428800  # 50 MB
+
 # Array de usuarios con contraseñas
 USERS = {
     "user1@gmail.com": "password1",
@@ -51,14 +52,13 @@ except FileNotFoundError:
 
 cipher_suite = Fernet(key)
 
-
 async def handle_client(reader, writer):
     client_address = writer.get_extra_info("peername")
     logs = []
 
     logging.info(f"Conexión establecida desde {client_address}")
     logs.append(f"Conexión establecida desde {client_address}")
-    
+
     if is_blocked(client_address):
         writer.write(b"421 Too many failed attempts. Try again later.\r\n")
         await writer.drain()
@@ -74,7 +74,7 @@ async def handle_client(reader, writer):
     rcpt_to = None
     data_mode = False
     email_data = []
-    authenticated = False
+    authenticated_user = None
 
     while True:
         try:
@@ -93,7 +93,7 @@ async def handle_client(reader, writer):
                     logging.info("Servidor: 250 OK (EHLO)")
                     await writer.drain()
                     continue
-       
+
             elif not authenticated_user:
                 if command.upper().startswith("AUTH LOGIN"):
                     writer.write(b"334 VXNlcm5hbWU6\r\n")
@@ -182,7 +182,7 @@ async def handle_client(reader, writer):
                             except FileNotFoundError:
                                 writer.write(b"250 No messages found\r\n")
                         except Exception as e:
-                            logging.error(f"Error al recuperar mensajes: {e}")
+                            logging.error(f"Error al recuperar mensajes servidor: {e}")
                             writer.write(b"550 Error retrieving messages\r\n")
                     await writer.drain()
                 elif command.upper() == "QUIT":
@@ -210,7 +210,8 @@ def save_email(mail_from, rcpt_to, email_data):
     logging.info(f"Guardando correo de {mail_from} para {rcpt_to}.")
     try:
         with open(f"{rcpt_to}_inbox.txt", "a") as f:
-            f.write(f"De: {mail_from}\\nPara: {rcpt_to}\\n{email_data}\\n\\n")
+            f.write(f"\n{email_data}\n\n")
+            f.write(f"\n")
     except IOError as e:
         logging.error(f"Error al guardar el correo: {e}")
 
@@ -226,43 +227,10 @@ async def start_server():
 
     async with server:
         await server.serve_forever()
-            
-def read_emails_from_file():
-    try:
-        with open("emails.txt", "r") as f:
-            lines = f.readlines()
-        
-        emails = []
-        email = ""
-        empty_line_count = 0
-        
-        for line in lines:
-            line = line.strip()  # Eliminar saltos de línea y espacios extras
-            
-            if not line:  # Si la línea está vacía
-                empty_line_count += 1
-                email += "\n"
-                if empty_line_count == 2:  # Si hay dos líneas vacías consecutivas
-                    if email:  # Guardar el SMS si no está vacío
-                        emails.append(email.strip())
-                        email = ""  # Reiniciar para el siguiente correo
-                    empty_line_count = 0  # Reiniciar el contador
-            else:
-                empty_line_count = 0  # Reiniciar el contador si no es una línea vacía
-                email += line + "\n"  # Agregar la línea al correo
-        
-        # Asegurarse de agregar el último correo si no termina con dos líneas vacías
-        if email:
-            emails.append(email.strip())
-        
-        return emails
 
-    except FileNotFoundError:
-        print("El archivo no existe.")
-        return []
 
 async def start_smtp_server():
-    from Servidor import start_server 
+    from Servidor import start_server  # Asegúrate de importar correctamente tu función `start_server`
     await start_server()
 if __name__ == "__main__":
     asyncio.run(start_smtp_server())
