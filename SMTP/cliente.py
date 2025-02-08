@@ -8,7 +8,7 @@ import re
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-SMTP_SERVER = "172.21.112.1"
+SMTP_SERVER = "127.0.0.1"
 SMTP_PORT = 2525
 
 def load_key():
@@ -59,7 +59,12 @@ async def authentication(sender, password):
 
         writer.write(base64.b64encode(password.encode()) + b"\r\n")
         await writer.drain()
-        await read_response(reader)
+        response = await read_response(reader)
+
+        # Verificar si el servidor respondió que la cuenta está bloqueada
+        if "535 Account is temporarily locked" in response:
+            logging.error("Cuenta bloqueada temporalmente.")
+            return "blocked"  # Retornar un estado especial para indicar bloqueo
 
         writer.write(b"QUIT\r\n")
         await writer.drain()
@@ -76,7 +81,8 @@ async def authentication(sender, password):
             writer.close()
             await writer.wait_closed()
         return Bool
-        
+
+
 async def send_email(sender, password, recipient, subject, message):
     logging.info("Iniciando envío de correo.")
     validate_email(sender)

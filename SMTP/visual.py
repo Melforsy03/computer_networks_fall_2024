@@ -65,12 +65,12 @@ class SMTPClientUI(QMainWindow):
                 border: 1px solid #660099; /* Borde morado oscuro */
             }
         """)
-
+       
         self.create_login_screen()
         self.create_menu_screen()
         self.create_send_email_screen()
         self.create_inbox_screen()
-
+        self.failed_attempts = 0
         self.stacked_widget.setCurrentWidget(self.login_screen)
 
     def create_login_screen(self):
@@ -84,7 +84,7 @@ class SMTPClientUI(QMainWindow):
 
         self.email_input = QLineEdit()
         self.email_input.setPlaceholderText("Correo electrónico")
-        self.email_input.setMinimumWidth(400)  
+        self.email_input.setMinimumWidth(400)
         layout.addWidget(self.email_input, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.password_input = QLineEdit()
@@ -102,9 +102,10 @@ class SMTPClientUI(QMainWindow):
         self.login_message = QLabel("")
         layout.addWidget(self.login_message, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        login_button = QPushButton("Iniciar sesión")
-        login_button.clicked.connect(self.login)
-        layout.addWidget(login_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        # ✅ Ahora `self.login_button` se usa en lugar de una variable local
+        self.login_button = QPushButton("Iniciar sesión")
+        self.login_button.clicked.connect(self.login)
+        layout.addWidget(self.login_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.login_screen.setLayout(layout)
         self.stacked_widget.addWidget(self.login_screen)
@@ -231,33 +232,56 @@ class SMTPClientUI(QMainWindow):
     def clean_and_go_to_inbox(self):
         self.inbox_table.setRowCount(0)  # Limpia la tabla
         self.stacked_widget.setCurrentWidget(self.inbox_screen)
-
     def login(self):
         email = self.email_input.text()
         password = self.password_input.text()
         self.login_message.setText("")
         
-        # Validación de campos vacíos
         if not email or not password:
             self.login_message.setText("Por favor, completa todos los campos.")
             return
         
         def auth_task():
             try:
-                self.login_message.setText("")
                 result = asyncio.run(authentication(email, password))
             
-                if result:
+                if result == "blocked":  # Caso en que la cuenta está bloqueada
+                    self.login_message.setText("Cuenta bloqueada temporalmente. Inténtalo de nuevo más tarde.")
+                    self.block_login()
+                elif result:
+                    self.failed_attempts = 0  # Restablecer intentos fallidos si se autentica
                     self.login_message.setText("Inicio de sesión exitoso.")
                     self.stacked_widget.setCurrentWidget(self.menu_screen)
                 else:
-                    self.login_message.setText("Usuario o contraseña incorrectos. Por favor, inténtalo de nuevo.")
+                    self.failed_attempts += 1
+                    if self.failed_attempts >= 3:
+                        self.block_login()
+                    else:
+                        self.login_message.setText(f"Usuario o contraseña incorrectos. Intento {self.failed_attempts}/3.")
             except Exception as e:
                     self.login_message.setText(f"Error: {e}")
 
         thread = threading.Thread(target=auth_task)
         thread.start()
+        
+    def block_login(self):
+            """🔹 Deshabilita el login tras 3 intentos fallidos por 30 segundos"""
+            self.login_message.setText("Demasiados intentos fallidos. Espera 30 segundos.")
+            self.email_input.setEnabled(False)
+            self.password_input.setEnabled(False)
+            self.login_button.setEnabled(False)
 
+            def unblock():
+                time.sleep(30)
+                self.failed_attempts = 0
+                self.email_input.setEnabled(True)
+                self.password_input.setEnabled(True)
+                self.login_button.setEnabled(True)
+                self.login_message.setText("Puedes intentar nuevamente.")
+
+            thread = threading.Thread(target=unblock)
+            thread.start()
+            
     def send_email(self):
         sender = self.email_input.text()
         password = self.password_input.text()
