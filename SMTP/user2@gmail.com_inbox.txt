@@ -46,3 +46,23 @@ Fecha: Mon, 27 Jan 2025 14:37:24 -0500
 MAL
 
 
+
+De: user1@gmail.com
+Para: user2@gmail.com
+De: user1@gmail.com
+Para: user2@gmail.com, user3@gmail.com
+Asunto: Envio Multiple
+Fecha: Sun, 09 Feb 2025 18:13:03 -0500
+
+Probando a ver si funciona el envio Multiple del Protocolo Smtp
+
+
+De: user1@gmail.com
+Para: user2@gmail.com
+De: user1@gmail.com
+Para: user2@gmail.com
+Asunto: Funciona el header ?
+Fecha: Sun, 09 Feb 2025 18:43:09 -0500
+
+No estoy soportando , desintalen la escuela
+

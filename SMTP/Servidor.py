@@ -89,6 +89,8 @@ async def handle_client(reader, writer):
     data_mode = False
     email_data = []
     authenticated_user = None
+    email_header = None
+
 
     while True:
         try:
@@ -176,16 +178,22 @@ async def handle_client(reader, writer):
                     else:
                         writer.write(b"250 OK\\r\\n")
                 elif command.upper().startswith("RCPT TO:"):
-                    rcpt_to = command[8:].strip()
-                    if rcpt_to not in USERS:
-                        writer.write(b"550 Recipient not recognized\\r\\n")
+                    
+                    if rcpt_to is None:
+                        rcpt_to = []
+                    email_recipient = command[8:].strip()
+                    if email_recipient in USERS:
+                        rcpt_to.append(email_recipient)
+                        writer.write(b"250 OK\r\n")
                     else:
-                        writer.write(b"250 OK\\r\\n")
+                        writer.write(b"550 Recipient not recognized\r\n")
+
                 elif command.upper() == "DATA":
                     writer.write(b"354 End data with <CR><LF>.<CR><LF>\r\n")
                     logging.info("Servidor: 354 End data with <CR><LF>.<CR><LF>")
                     logs.append("Servidor: 354 End data with <CR><LF>.<CR><LF>")
                     data_mode = True
+                    
                 elif command.upper() == "RETRIEVE":
                     if not authenticated_user:
                         writer.write(b"530 Authentication required\r\n")
@@ -229,14 +237,15 @@ async def handle_client(reader, writer):
     writer.close()
     await writer.wait_closed()
 
-def save_email(mail_from, rcpt_to, email_data):
-    logging.info(f"Guardando correo de {mail_from} para {rcpt_to}.")
-    try:
-        with open(f"{rcpt_to}_inbox.txt", "a") as f:
-            f.write(f"\n{email_data}\n\n")
-            f.write(f"\n")
-    except IOError as e:
-        logging.error(f"Error al guardar el correo: {e}")
+def save_email(mail_from, recipients, email_data):
+    logging.info(f"Guardando correo de {mail_from} para {', '.join(recipients)}.")
+    for rcpt_to in recipients:
+        try:
+            inbox_file = f"{rcpt_to}_inbox.txt"
+            with open(inbox_file, "a") as f:
+                f.write(f"\nDe: {mail_from}\nPara: {rcpt_to}\n{email_data}\n\n")
+        except IOError as e:
+            logging.error(f"Error al guardar el correo para {rcpt_to}: {e}")
 
 
 async def start_server():

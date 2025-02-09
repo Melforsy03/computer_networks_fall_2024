@@ -44,3 +44,23 @@ Fecha: Mon, 27 Jan 2025 14:40:43 -0500
 hello, need help with DAA
 
 
+
+De: user1@gmail.com
+Para: user3@gmail.com
+De: user1@gmail.com
+Para: user2@gmail.com, user3@gmail.com
+Asunto: Envio Multiple
+Fecha: Sun, 09 Feb 2025 18:13:03 -0500
+
+Probando a ver si funciona el envio Multiple del Protocolo Smtp
+
+
+De: user2@gmail.com
+Para: user3@gmail.com
+De: user2@gmail.com
+Para: user1@gmail.com, user3@gmail.com
+Asunto: Veamos este caso
+Fecha: Sun, 09 Feb 2025 18:51:40 -0500
+
+La conmemoración del Día del Idioma (23 de abril) celebrada anualmente era en efecto, uno de los eventos fundamentales de la Corporación. Con motivo de esta fecha tenía lugar un amplio programa cultural que incluía la peregrinación hacia la plaza de San Juan de Dios para colocar una ofrenda floral en el monumento de Miguel de Cervantes, y el académico designado dictaba una conferencia.
+
