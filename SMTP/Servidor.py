@@ -19,27 +19,41 @@ USERS = {
 }
 
 # Configuración de fuerza bruta
-MAX_FAILED_ATTEMPTS = 3
-BLOCK_TIME = timedelta(minutes=5)
-failed_attempts = {}
+MAX_FAILED_ATTEMPTS = 3 
+BLOCK_TIME = timedelta(minutes=5)  
+failed_attempts = {}  
 
-def is_blocked(client_address):
-    # Verificar si la IP está bloqueada
+def is_blocked(client_address, username):
+    # Verificar si la IP o el usuario está bloqueado
+    if username in failed_attempts:
+        attempts, block_time = failed_attempts[username]
+        if attempts >= MAX_FAILED_ATTEMPTS and datetime.now() < block_time:
+            return True
+        elif datetime.now() >= block_time:
+            del failed_attempts[username]  # Desbloquear usuario
+            
     if client_address in failed_attempts:
         attempts, block_time = failed_attempts[client_address]
         if attempts >= MAX_FAILED_ATTEMPTS and datetime.now() < block_time:
             return True
         elif datetime.now() >= block_time:
             del failed_attempts[client_address]  # Desbloquear IP
+            
     return False
 
-def register_failed_attempt(client_address):
+def register_failed_attempt(username, client_address):
+    if username not in failed_attempts:
+        failed_attempts[username] = [0, datetime.now()]
+    failed_attempts[username][0] += 1
+    if failed_attempts[username][0] >= MAX_FAILED_ATTEMPTS:
+        failed_attempts[username][1] = datetime.now() + BLOCK_TIME  # Bloqueo de 30s
+    
     if client_address not in failed_attempts:
         failed_attempts[client_address] = [0, datetime.now()]
     failed_attempts[client_address][0] += 1
     if failed_attempts[client_address][0] >= MAX_FAILED_ATTEMPTS:
-        failed_attempts[client_address][1] = datetime.now() + BLOCK_TIME
-        
+        failed_attempts[client_address][1] = datetime.now() + BLOCK_TIME  # Bloqueo de 30s
+
 # Configuración de logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 
@@ -59,7 +73,7 @@ async def handle_client(reader, writer):
     logging.info(f"Conexión establecida desde {client_address}")
     logs.append(f"Conexión establecida desde {client_address}")
 
-    if is_blocked(client_address):
+    if is_blocked(client_address , ""):
         writer.write(b"421 Too many failed attempts. Try again later.\r\n")
         await writer.drain()
         logging.warning(f"Conexión rechazada para {client_address}: demasiados intentos fallidos.")
@@ -88,11 +102,12 @@ async def handle_client(reader, writer):
             command = data.decode("utf-8").strip()
             logging.info(f"Cliente {client_address}: {command}")
             logs.append(f"Cliente {client_address}: {command}")
+
             if command.upper().startswith("EHLO") or command.upper().startswith("HELO"):
-                    writer.write(b"250 OK\r\n")
-                    logging.info("Servidor: 250 OK (EHLO)")
-                    await writer.drain()
-                    continue
+                writer.write(b"250 OK\r\n")
+                logging.info("Servidor: 250 OK (EHLO)")
+                await writer.drain()
+                continue
 
             elif not authenticated_user:
                 if command.upper().startswith("AUTH LOGIN"):
@@ -105,20 +120,28 @@ async def handle_client(reader, writer):
 
                     password = base64.b64decode(await reader.readline()).decode("utf-8").strip()
 
+                    if is_blocked(client_address, username):
+                        writer.write(b"535 Account is temporarily locked. Try again later.\r\n")
+                        await writer.drain()
+                        logging.warning(f"Intento de autenticación bloqueado para {username}.")
+                        break
+
                     if username in USERS and USERS[username] == password:
                         authenticated_user = username
                         writer.write(b"235 Authentication successful\r\n")
                         await writer.drain()
                         continue
                     else:
+                        register_failed_attempt(username,client_address)
                         writer.write(b"535 Authentication failed\r\n")
                         await writer.drain()
+                        logging.warning(f"Intento de autenticación fallido para {username}.")
                         break
                 else:
                     writer.write(b"530 Authentication required\r\n")
                     await writer.drain()
                     continue
-
+                
             if data_mode:
                 if command == ".":
                     if len("\n".join(email_data)) > MAX_EMAIL_SIZE:
