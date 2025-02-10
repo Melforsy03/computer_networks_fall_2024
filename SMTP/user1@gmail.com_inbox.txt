@@ -1,95 +1,16 @@
+---
 De: user2@gmail.com
 Para: user1@gmail.com
-Asunto: Como estas?
-Fecha: Fri, 25 Jan 2025 09:47:18 -0500
+Asunto: anuidfaodfhasofhsuia
+Fecha: Mon, 10 Feb 2025 10:30:14 -0500
 
-Hola User1,
+Envio Multiple
 
-Espero que estes bien. Ha pasado un tiempo desde nuestra ultima conversacion y me gustaria saber como va todo en tu vida. Como te ha tratado el trabajo ultimamente? Recuerdo que estabas trabajando en ese proyecto importante y estoy curioso por saber como ha evolucionado.
-
-Ademas, que tal con tu familia? Espero que todos esten bien y disfrutando de buena salud. Siempre me acuerdo de las historias que solias contar sobre tus viajes familiares. Tienes algun plan para unas vacaciones pronto?
-
-Por otro lado, me encantaria saber como va tu aficion por la fotografia. Recuerdo que habias mencionado que estabas tomando clases y que habias mejorado mucho. Has tenido la oportunidad de salir a capturar algunas imagenes recientes? Me encantaria ver tus fotos si tienes algunas nuevas.
-
-Tambien me gustaria saber si has estado leyendo algo interesante ultimamente. Siempre compartias recomendaciones de libros que resultaban ser excelentes, asi que estoy en busca de algo nuevo para leer.
-
-Por ultimo, como va tu salud? Espero que estes cuidandote y encontrando tiempo para relajarte en medio de tus ocupaciones. Es importante mantener un equilibrio, especialmente cuando la vida se vuelve agitada.
-
-Espero que podamos ponernos al dia pronto. Me encantaria escuchar todas tus novedades y compartir algunas de las mias tambien.
-
-Cuidate mucho y espero tu respuesta.
-
-Un abrazo,
-User2.
-
+---
 De: user3@gmail.com
 Para: user1@gmail.com
-Asunto: Grandes noticias!!!!
-Fecha: Fri, 25 Jan 2025 11:47:18 -0500
+Asunto: otro envio multiple
+Fecha: Mon, 10 Feb 2025 10:32:42 -0500
 
-Hola User1,
-
-Espero que estes teniendo un excelente dia. Queria escribirte porque tengo una noticia increible que estoy muy emocionado de compartir contigo. He recibido la confirmacion de que he sido seleccionado para el programa de intercambio en el extranjero!
-
-Como sabes, siempre he sonado con estudiar en el extranjero y ahora, finalmente, se ha hecho realidad. El programa es en una universidad en Europa, y estare alli durante un semestre completo. La universidad tiene un enfoque impresionante en mi area de estudios, y estoy seguro de que sera una experiencia transformadora para mi carrera.
-
-He estado investigando sobre el lugar y hay tanto que hacer y ver. Desde visitar museos historicos hasta explorar la cultura local, estoy ansioso por sumergirme en todo lo que esta nueva ciudad tiene para ofrecer. Ademas, me emociona la idea de conocer a estudiantes de diferentes partes del mundo y aprender de sus experiencias.
-
-Por supuesto, hay muchos detalles logisticos que debo resolver, como el alojamiento y la visa, pero estoy trabajando en eso. La universidad tiene un excelente servicio de apoyo para estudiantes internacionales, asi que creo que estare en buenas manos.
-
-Me encantaria saber que piensas al respecto. Se que tu tambien has tenido experiencias internacionales y me encantaria escuchar tus consejos sobre como aprovechar al maximo este tipo de oportunidades. Tambien, si conoces a alguien en esa area o has estado alli antes, cualquier recomendacion seria muy apreciada.
-
-Ademas, planeo organizar una reunion antes de irme para despedirme de todos mis amigos y compartir un poco de esta emocion con ellos. Seria genial si pudieras venir; me encantaria verte y ponernos al dia antes de mi partida.
-
-Espero que estes tan emocionado como yo por esta nueva aventura. No puedo esperar para compartir mas detalles contigo a medida que se vayan desarrollando las cosas.
-
-Cuidate mucho y espero tu respuesta pronto.
-
-Un abrazo,
-User2.
-
-De: user2@gmail.com
-Para: user1@gmail.com
-Asunto: Respuesta a la prueba 1
-Fecha: Tue, 21 Jan 2025 15:30:41 -0500
-
-Se envian bien los sms desde el visual hasta el ciente.
-
-De: user2@gmail.com
-Para: user1@gmail.com
-Asunto: Respuesta a la prueba 2
-Fecha: Tue, 21 Jan 2025 15:30:41 -0500
-
-Se ven ya todos los sms y no solo el primero.
-
-De: user3@gmail.com
-Para: user1@gmail.com
-Asunto: Prueba 3
-Fecha: Sat, 25 Jan 2025 09:57:29 -0500
-
-Vamos a ver como coge las distintas lineas de texto o si la linea es muy larga, hay que ver si se muestra completa, o si solo hasta que quepa en la pantalla. En caso de que solo se muestre lo que quepa, hay q forzar los cambios de linea.
-Ademas hay q ver si, se ven las 3 lineas, porque hasta ahora solo se ven 2.
-
-De: user3@gmail.com
-Para: user1@gmail.com
-Asunto: Respuesta a la prueba L
-Fecha: Fri, 24 Jan 2025 07:47:18 -0500
-
-Ya se limpian las ventanas una vez sales d ellas y vuelves a entrar, YUPIIIIII!!!!
-
-
-
-
-
-
-
-
-De: user2@gmail.com
-Para: user1@gmail.com
-De: user2@gmail.com
-Para: user1@gmail.com, user3@gmail.com
-Asunto: Veamos este caso
-Fecha: Sun, 09 Feb 2025 18:51:40 -0500
-
-La conmemoración del Día del Idioma (23 de abril) celebrada anualmente era en efecto, uno de los eventos fundamentales de la Corporación. Con motivo de esta fecha tenía lugar un amplio programa cultural que incluía la peregrinación hacia la plaza de San Juan de Dios para colocar una ofrenda floral en el monumento de Miguel de Cervantes, y el académico designado dictaba una conferencia.
+Informacion enviada con exito , proyecto funcionando
 

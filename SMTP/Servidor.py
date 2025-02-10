@@ -24,7 +24,7 @@ BLOCK_TIME = timedelta(minutes=5)
 failed_attempts = {}  
 
 def is_blocked(client_address, username):
-    # Verificar si la IP o el usuario está bloqueado
+    
     if username in failed_attempts:
         attempts, block_time = failed_attempts[username]
         if attempts >= MAX_FAILED_ATTEMPTS and datetime.now() < block_time:
@@ -89,8 +89,7 @@ async def handle_client(reader, writer):
     data_mode = False
     email_data = []
     authenticated_user = None
-    email_header = None
-
+   
 
     while True:
         try:
@@ -110,6 +109,17 @@ async def handle_client(reader, writer):
                 logging.info("Servidor: 250 OK (EHLO)")
                 await writer.drain()
                 continue
+            
+            elif command.upper().startswith("CHECK BLOCK"):
+                username = command.split(" ")[1] if len(command.split(" ")) > 1 else ""
+                if is_blocked(client_address, username):
+                    writer.write(b"403 BLOCKED\r\n")  
+                    await writer.drain()
+                    logging.warning(f"Estado consultado: {username} está bloqueado.")
+                else:
+                    writer.write(b"200 OK\r\n")  
+                    await writer.drain()
+                continue
 
             elif not authenticated_user:
                 if command.upper().startswith("AUTH LOGIN"):
@@ -126,7 +136,7 @@ async def handle_client(reader, writer):
                         writer.write(b"535 Account is temporarily locked. Try again later.\r\n")
                         await writer.drain()
                         logging.warning(f"Intento de autenticación bloqueado para {username}.")
-                        break
+                        return
 
                     if username in USERS and USERS[username] == password:
                         authenticated_user = username
@@ -239,11 +249,26 @@ async def handle_client(reader, writer):
 
 def save_email(mail_from, recipients, email_data):
     logging.info(f"Guardando correo de {mail_from} para {', '.join(recipients)}.")
+    
     for rcpt_to in recipients:
         try:
             inbox_file = f"{rcpt_to}_inbox.txt"
             with open(inbox_file, "a") as f:
-                f.write(f"\nDe: {mail_from}\nPara: {rcpt_to}\n{email_data}\n\n")
+                f.write(f"---\n")  # Delimitador para cada mensaje
+                f.write(f"De: {mail_from}\nPara: {rcpt_to}\n")
+                
+                # Extraer asunto y fecha si están en el mensaje
+                lines = email_data.strip().split("\n")
+                subject = next((line for line in lines if line.startswith("Asunto:")), "Asunto: (Sin asunto)")
+                date = next((line for line in lines if line.startswith("Fecha:")), "Fecha: (Sin fecha)")
+                
+                f.write(f"{subject}\n{date}\n")
+                
+                # Guardar el cuerpo del mensaje
+                body_start_index = next((i for i, line in enumerate(lines) if line.strip() == ""), None)
+                body = "\n".join(lines[body_start_index+1:]) if body_start_index is not None else "(Sin cuerpo)"
+                
+                f.write(f"\n{body}\n\n")
         except IOError as e:
             logging.error(f"Error al guardar el correo para {rcpt_to}: {e}")
 

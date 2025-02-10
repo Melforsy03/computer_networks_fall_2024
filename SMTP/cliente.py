@@ -93,7 +93,6 @@ async def send_email(sender, password, recipients, subject, message,use_header_c
     if extra_headers:
         headers += extra_headers + "\n"
 
-    # Si se usa el comando HEADER, se cifra solo el cuerpo; de lo contrario, se cifra todo (cabecera + cuerpo)
     if use_header_command:
         encrypted_body = cipher_suite.encrypt(message.encode())
     else:
@@ -242,6 +241,33 @@ async def retrieve_messages(sender, password, smtp_server=DEFAULT_SMTP_SERVER, s
                 logging.warning(f"Error al cerrar la conexión: {close_error}")
 
     return messages
+
+async def check_if_blocked(username, smtp_server=DEFAULT_SMTP_SERVER, smtp_port=DEFAULT_SMTP_PORT):
+    logging.info(f"Verificando si {username} está bloqueado...")
+    
+    ssl_context = ssl.create_default_context()
+    ssl_context.load_verify_locations("server.crt")
+
+    try:
+        reader, writer = await asyncio.open_connection(smtp_server, smtp_port, ssl=ssl_context)
+        await read_response(reader)
+
+        writer.write(f"CHECK BLOCK {username}\r\n".encode())
+        await writer.drain()
+        response = await read_response(reader)
+
+        writer.write(b"QUIT\r\n")
+        await writer.drain()
+        await read_response(reader)
+
+        if "403 BLOCKED" in response:
+            logging.warning(f"Usuario {username} está bloqueado.")
+            return True  # El usuario está bloqueado
+        return False  # El usuario no está bloqueado
+
+    except Exception as e:
+        logging.error(f"Error al verificar bloqueo: {e}")
+        return False
 
 
 if __name__ == "__main__":
