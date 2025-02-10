@@ -93,20 +93,11 @@ async def send_email(sender, password, recipients, subject, message,
     #if extra_headers:
     #    headers += extra_headers + "\n"
 
-<<<<<<< HEAD
     if use_header_command:
         encrypted_body = cipher_suite.encrypt(message.encode())
     else:
         full_message = headers + "\n" + message
         encrypted_body = cipher_suite.encrypt(full_message.encode())
-=======
-    # Si se usa el comando HEADER, se cifra solo el cuerpo; de lo contrario, se cifra todo (cabecera + cuerpo)
-    #if use_header_command:
-    #    encrypted_body = cipher_suite.encrypt(message.encode())
-    #else:
-    full_message = headers + "\n" + message
-    encrypted_body = cipher_suite.encrypt(full_message.encode())
->>>>>>> 33e69b84f89db137afd170c4d3ccce854d8b1f7d
 
     ssl_context = ssl.create_default_context()
     ssl_context.load_verify_locations("server.crt")
