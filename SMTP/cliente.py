@@ -30,13 +30,11 @@ async def send_email(sender, password, recipients, subject, message, extra_heade
     logging.info("Iniciando envío de correo.")
     validate_email(sender)
     
-    # Si recipients es una cadena, se separa usando la coma como separador.
     if isinstance(recipients, str):
         recipients = [r.strip() for r in recipients.split(",") if r.strip()]
     for r in recipients:
         validate_email(r)
     
-    # Construir los encabezados
     headers = f"From: {sender}\r\n"
     headers += f"To: {', '.join(recipients)}\r\n"
     headers += f"Subject: {subject}\r\n"
@@ -45,13 +43,11 @@ async def send_email(sender, password, recipients, subject, message, extra_heade
         headers += f"{key}: {value}\r\n"
     headers += "\r\n"
     
-    # Mensaje completo: encabezados + cuerpo
     plain_message = headers + message
 
     reader, writer = None, None
     sent = False
     try:
-        # Conexión en modo plano (sin SSL)
         reader, writer = await asyncio.open_connection(smtp_server, smtp_port)
         await read_response(reader)
         
@@ -59,7 +55,6 @@ async def send_email(sender, password, recipients, subject, message, extra_heade
         await writer.drain()
         await read_response(reader)
         
-        # Intentar autenticación con AUTH PLAIN; si el servidor responde "502", se ignora.
         try:
             auth_str = "\0" + sender + "\0" + password
             auth_b64 = base64.b64encode(auth_str.encode())
@@ -103,10 +98,8 @@ async def send_email(sender, password, recipients, subject, message, extra_heade
             await writer.wait_closed()
         return sent
 
-# --- Funciones authentication y retrieve_messages se mantienen (no son llamadas en main) ---
 
 if __name__ == "__main__":
-    # Deshabilitamos la ayuda automática para poder usar -h para header.
     parser = argparse.ArgumentParser(
         description="Cliente SMTP simple (texto plano).",
         add_help=False
@@ -127,8 +120,7 @@ if __name__ == "__main__":
                         help="Muestra este mensaje de ayuda y sale.")
 
     args = parser.parse_args()
-
-    # Unir los tokens de cada argumento en una cadena.
+    
     # Si subject o body no se proporcionan, se usa cadena vacía.
     subject = " ".join(args.subject) if args.subject else ""
     body = " ".join(args.body) if args.body else ""
