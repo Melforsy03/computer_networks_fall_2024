@@ -227,7 +227,11 @@ async def retrieve_messages(sender, password, smtp_server=DEFAULT_SMTP_SERVER, s
     return messages
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Cliente SMTP simple (texto plano).")
+    # Deshabilitamos la ayuda por defecto para poder usar -h para header
+    parser = argparse.ArgumentParser(
+        description="Cliente SMTP simple.",
+        add_help=False
+    )
     parser.add_argument("-p", "--port", type=int, required=True, help="Puerto SMTP.")
     parser.add_argument("-u", "--host", type=str, required=True, help="Host SMTP.")
     parser.add_argument("-f", "--from_mail", type=str, required=True, help="Correo del remitente.")
@@ -236,6 +240,9 @@ if __name__ == "__main__":
     parser.add_argument("-b", "--body", type=str, required=True, help="Cuerpo del correo.")
     parser.add_argument("-h", "--header", type=str, default="{}", help="Encabezados adicionales en formato JSON.")
     parser.add_argument("-P", "--password", type=str, default="default", help="Contraseña del remitente")
+    # Agregamos manualmente la opción de ayuda
+    parser.add_argument("--help", action="help", default=argparse.SUPPRESS,
+                        help="Muestra este mensaje de ayuda y sale.")
 
     args = parser.parse_args()
 
