@@ -1,11 +1,10 @@
 import asyncio
 import base64
-from cryptography.fernet import Fernet
 import ssl
 from email.utils import formatdate
 import logging
 import re
-import argparse  
+import argparse
 import json
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -13,13 +12,6 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 # Valores por defecto para el servidor y puerto SMTP
 DEFAULT_SMTP_SERVER = "127.0.0.1"
 DEFAULT_SMTP_PORT = 2525
-
-def load_key():
-    logging.info("Cargando clave de cifrado.")
-    with open("secret.key", "rb") as key_file:
-        return key_file.read()
-
-cipher_suite = Fernet(load_key())
 
 def validate_email(email):
     email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
@@ -81,7 +73,6 @@ async def authentication(sender, password, smtp_server=DEFAULT_SMTP_SERVER, smtp
         return is_authenticated
 
 async def send_email(sender, password, recipients, subject, message, extra_headers, smtp_server=DEFAULT_SMTP_SERVER, smtp_port=DEFAULT_SMTP_PORT):
-    
     logging.info("Iniciando envío de correo.")
     validate_email(sender)
     
@@ -103,8 +94,7 @@ async def send_email(sender, password, recipients, subject, message, extra_heade
     plain_message = headers + message
 
     reader, writer = None, None
-    success = False
-
+    sent = False  
     try:
         reader, writer = await asyncio.open_connection(smtp_server, smtp_port)
         await read_response(reader)
@@ -147,7 +137,7 @@ async def send_email(sender, password, recipients, subject, message, extra_heade
         await read_response(reader)
 
         logging.info("Correo enviado correctamente.")
-        success = True
+        sent = True
 
     except Exception as e:
         logging.error(f"Error al enviar el correo: {e}")
@@ -156,7 +146,7 @@ async def send_email(sender, password, recipients, subject, message, extra_heade
         if writer:
             writer.close()
             await writer.wait_closed()
-        return success
+        return sent
 
 async def retrieve_messages(sender, password, smtp_server=DEFAULT_SMTP_SERVER, smtp_port=DEFAULT_SMTP_PORT):
     logging.info("Conectando para recuperar mensajes.")
@@ -210,7 +200,6 @@ async def retrieve_messages(sender, password, smtp_server=DEFAULT_SMTP_SERVER, s
             logging.info(f"Mensajes recibidos:\n{response_decoded}")
             
             raw_messages = response_decoded.split("\r\n.\r\n")
-            
             for raw_message in raw_messages:
                 if raw_message.strip():
                     messages.append(raw_message.strip())
@@ -236,7 +225,6 @@ async def retrieve_messages(sender, password, smtp_server=DEFAULT_SMTP_SERVER, s
                 logging.warning(f"Error al cerrar la conexión: {close_error}")
 
     return messages
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Cliente SMTP simple (texto plano).")
@@ -274,8 +262,8 @@ if __name__ == "__main__":
 
     try:
         result = asyncio.run(send_email(args.from_mail, args.password,
-                                        recipients, args.subject, args.body,
-                                        extra_headers, SMTP_SERVER, SMTP_PORT))
+                                          recipients, args.subject, args.body,
+                                          extra_headers, SMTP_SERVER, SMTP_PORT))
         if result:
             output = {"status_code": 333, "message": "Correo enviado correctamente."}
         else:
@@ -283,5 +271,4 @@ if __name__ == "__main__":
     except Exception as e:
         output = {"status_code": 500, "message": f"Excepción: {e}"}
 
-    # Imprimir la salida en formato JSON
     print(json.dumps(output))
