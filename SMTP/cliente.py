@@ -26,6 +26,7 @@ async def read_response(reader):
         raise Exception(f"Error del servidor: {response_decoded}")
     return response_decoded
 
+# (Esta función ya no se usa en el main, pero se actualiza para autenticación con AUTH PLAIN)
 async def authentication(sender, password, smtp_server=DEFAULT_SMTP_SERVER, smtp_port=DEFAULT_SMTP_PORT):
     logging.info("Iniciando autenticación.")
     validate_email(sender)
@@ -44,15 +45,10 @@ async def authentication(sender, password, smtp_server=DEFAULT_SMTP_SERVER, smtp
         await writer.drain()
         await read_response(reader)
 
-        writer.write(b"AUTH LOGIN\r\n")
-        await writer.drain()
-        await read_response(reader)
-
-        writer.write(base64.b64encode(sender.encode()) + b"\r\n")
-        await writer.drain()
-        await read_response(reader)
-
-        writer.write(base64.b64encode(password.encode()) + b"\r\n")
+        # Usar AUTH PLAIN: el string es "\0<username>\0<password>"
+        auth_str = "\0" + sender + "\0" + password
+        auth_b64 = base64.b64encode(auth_str.encode())
+        writer.write(b"AUTH PLAIN " + auth_b64 + b"\r\n")
         await writer.drain()
         await read_response(reader)
 
@@ -76,25 +72,26 @@ async def send_email(sender, password, recipients, subject, message, extra_heade
     logging.info("Iniciando envío de correo.")
     validate_email(sender)
     
+    # Si recipients es una cadena, la separamos por comas
     if isinstance(recipients, str):
         recipients = [r.strip() for r in recipients.split(",") if r.strip()]
     for r in recipients:
         validate_email(r)
 
+    # Construir los encabezados
     headers = f"From: {sender}\r\n"
     headers += f"To: {', '.join(recipients)}\r\n"
     headers += f"Subject: {subject}\r\n"
     headers += f"Date: {formatdate(localtime=True)}\r\n"
-
     for key, value in extra_headers.items():
         headers += f"{key}: {value}\r\n"
-    headers += "\r\n" 
+    headers += "\r\n"
 
-    # Construir el mensaje completo (encabezados + cuerpo)
+    # Mensaje completo: encabezados + cuerpo
     plain_message = headers + message
 
     reader, writer = None, None
-    sent = False  
+    sent = False
     try:
         reader, writer = await asyncio.open_connection(smtp_server, smtp_port)
         await read_response(reader)
@@ -103,24 +100,19 @@ async def send_email(sender, password, recipients, subject, message, extra_heade
         await writer.drain()
         await read_response(reader)
 
-        writer.write(b"AUTH LOGIN\r\n")
+        # Autenticación usando AUTH PLAIN
+        auth_str = "\0" + sender + "\0" + password
+        auth_b64 = base64.b64encode(auth_str.encode())
+        writer.write(b"AUTH PLAIN " + auth_b64 + b"\r\n")
         await writer.drain()
         await read_response(reader)
 
-        writer.write(base64.b64encode(sender.encode()) + b"\r\n")
-        await writer.drain()
-        await read_response(reader)
-
-        writer.write(base64.b64encode(password.encode()) + b"\r\n")
-        await writer.drain()
-        await read_response(reader)
-
-        writer.write(f"MAIL FROM:{sender}\r\n".encode())
+        writer.write(f"MAIL FROM:<{sender}>\r\n".encode())
         await writer.drain()
         await read_response(reader)
 
         for r in recipients:
-            writer.write(f"RCPT TO:{r}\r\n".encode())
+            writer.write(f"RCPT TO:<{r}>\r\n".encode())
             await writer.drain()
             await read_response(reader)
 
@@ -164,15 +156,10 @@ async def retrieve_messages(sender, password, smtp_server=DEFAULT_SMTP_SERVER, s
         await writer.drain()
         await read_response(reader)
 
-        writer.write(b"AUTH LOGIN\r\n")
-        await writer.drain()
-        await read_response(reader)
-
-        writer.write(base64.b64encode(sender.encode()) + b"\r\n")
-        await writer.drain()
-        await read_response(reader)
-
-        writer.write(base64.b64encode(password.encode()) + b"\r\n")
+        # Autenticación con AUTH PLAIN
+        auth_str = "\0" + sender + "\0" + password
+        auth_b64 = base64.b64encode(auth_str.encode())
+        writer.write(b"AUTH PLAIN " + auth_b64 + b"\r\n")
         await writer.drain()
         await read_response(reader)
 
@@ -187,10 +174,8 @@ async def retrieve_messages(sender, password, smtp_server=DEFAULT_SMTP_SERVER, s
                 if not chunk:  
                     break
                 response += chunk
-
                 if response.endswith(b"\r\n.\r\n"):
                     break
-
             except asyncio.TimeoutError:
                 logging.warning("Timeout al esperar más datos del servidor.")
                 break
@@ -198,12 +183,10 @@ async def retrieve_messages(sender, password, smtp_server=DEFAULT_SMTP_SERVER, s
         try:
             response_decoded = response.decode(errors='replace')
             logging.info(f"Mensajes recibidos:\n{response_decoded}")
-            
             raw_messages = response_decoded.split("\r\n.\r\n")
             for raw_message in raw_messages:
                 if raw_message.strip():
                     messages.append(raw_message.strip())
-            
         except Exception as decode_error:
             logging.error(f"Error al decodificar los mensajes: {decode_error}")
             raise
@@ -227,9 +210,9 @@ async def retrieve_messages(sender, password, smtp_server=DEFAULT_SMTP_SERVER, s
     return messages
 
 if __name__ == "__main__":
-    # Deshabilitamos la ayuda por defecto para poder usar -h para header
+    # Deshabilitamos la ayuda automática para poder usar -h para header
     parser = argparse.ArgumentParser(
-        description="Cliente SMTP simple.",
+        description="Cliente SMTP simple (texto plano).",
         add_help=False
     )
     parser.add_argument("-p", "--port", type=int, required=True, help="Puerto SMTP.")
@@ -238,7 +221,8 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--to_mail", type=str, required=True, help="Lista de correos destinatarios en formato JSON.")
     parser.add_argument("-s", "--subject", type=str, required=True, help="Asunto del correo.", nargs="+")
     parser.add_argument("-b", "--body", type=str, required=True, help="Cuerpo del correo.", nargs="+")
-    parser.add_argument("-h", "--header", type=str, default="{}", help="Encabezados adicionales en formato JSON.")
+    # Configuramos -h para header (nargs='+' para que se unan los tokens si contiene espacios)
+    parser.add_argument("-h", "--header", type=str, default="{}", help="Encabezados adicionales en formato JSON.", nargs="+")
     parser.add_argument("-P", "--password", type=str, default="default", help="Contraseña del remitente")
     # Agregamos manualmente la opción de ayuda
     parser.add_argument("--help", action="help", default=argparse.SUPPRESS,
@@ -246,8 +230,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # Unir las palabras de subject, body y header
     subject = " ".join(args.subject)
     body = " ".join(args.body)
+    header_str = " ".join(args.header)
 
     # Parsear el parámetro to_mail (convertir de cadena JSON a lista)
     try:
@@ -260,7 +246,7 @@ if __name__ == "__main__":
 
     # Parsear el parámetro header (convertir de cadena JSON a diccionario)
     try:
-        extra_headers = json.loads(args.header)
+        extra_headers = json.loads(header_str)
         if not isinstance(extra_headers, dict):
             raise ValueError("header debe ser un diccionario")
     except Exception as e:
