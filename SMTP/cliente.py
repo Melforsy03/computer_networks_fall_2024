@@ -78,7 +78,7 @@ async def authentication(sender, password, smtp_server=DEFAULT_SMTP_SERVER, smtp
             await writer.wait_closed()
         return is_authenticated
 
-async def send_email(sender, password, recipients, subject, message,use_header_command=False, extra_headers="",
+async def send_email(sender, password, recipients, subject, message,
                     smtp_server=DEFAULT_SMTP_SERVER, smtp_port=DEFAULT_SMTP_PORT):
     
     logging.info("Iniciando envío de correo.")
@@ -90,15 +90,15 @@ async def send_email(sender, password, recipients, subject, message,use_header_c
         validate_email(r)
 
     headers = f"De: {sender}\nPara: {', '.join(recipients)}\nAsunto: {subject}\nFecha: {formatdate(localtime=True)}\n"
-    if extra_headers:
-        headers += extra_headers + "\n"
+    #if extra_headers:
+    #    headers += extra_headers + "\n"
 
     # Si se usa el comando HEADER, se cifra solo el cuerpo; de lo contrario, se cifra todo (cabecera + cuerpo)
-    if use_header_command:
-        encrypted_body = cipher_suite.encrypt(message.encode())
-    else:
-        full_message = headers + "\n" + message
-        encrypted_body = cipher_suite.encrypt(full_message.encode())
+    #if use_header_command:
+    #    encrypted_body = cipher_suite.encrypt(message.encode())
+    #else:
+    full_message = headers + "\n" + message
+    encrypted_body = cipher_suite.encrypt(full_message.encode())
 
     ssl_context = ssl.create_default_context()
     ssl_context.load_verify_locations("server.crt")
@@ -135,10 +135,10 @@ async def send_email(sender, password, recipients, subject, message,use_header_c
             await writer.drain()
             await read_response(reader)
 
-        if use_header_command:
-            writer.write(f"HEADER {headers}\r\n".encode())
-            await writer.drain()
-            await read_response(reader)
+        #if use_header_command:
+        #    writer.write(f"HEADER {headers}\r\n".encode())
+        #    await writer.drain()
+        #    await read_response(reader)
 
         writer.write(b"DATA\r\n")
         await writer.drain()
@@ -246,7 +246,7 @@ async def retrieve_messages(sender, password, smtp_server=DEFAULT_SMTP_SERVER, s
 
 if __name__ == "__main__":
     sender = "user2@gmail.com"
-    recipients = ["user1@gmail.com", "user3@gmail.com"]  # Múltiples destinatarios
+    recipients = ["user1@gmail.com", "user3@gmail.com"]  
     subject = "Asunto de prueba 2"
     message = "Este es un mensaje de prueba, para ver si coge sms."
     password = "tu_contraseña_secreta"
@@ -255,6 +255,4 @@ if __name__ == "__main__":
     use_header_command = True
     extra_headers = "X-Custom-Header: Valor personalizado"
 
-    asyncio.run(send_email(sender, password, recipients, subject, message,
-                           use_header_command=use_header_command,
-                           extra_headers=extra_headers))
+    asyncio.run(send_email(sender, password, recipients, subject, message))
