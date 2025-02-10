@@ -29,14 +29,15 @@ async def send_email(sender, password, recipients, subject, message, extra_heade
     logging.info("Iniciando envío de correo.")
     Type = 0
     sent = False
+    message = ""
     if not validate_email(sender):
-        return sent,1
+        Type = 1
     
     if isinstance(recipients, str):
         recipients = [r.strip() for r in recipients.split(",") if r.strip()]
     for r in recipients:
         if not validate_email(r):
-            return sent,2
+            Type = 2
     
     headers = f"From: {sender}\r\n"
     headers += f"To: {', '.join(recipients)}\r\n"
@@ -72,23 +73,32 @@ async def send_email(sender, password, recipients, subject, message, extra_heade
         writer.write(f"MAIL FROM:{sender}\r\n".encode())
         await writer.drain()
         await read_response(reader)
+        if Type == 1: 
+            message = read_response(reader)
+            return sent, Type, message
         
         for r in recipients:
             writer.write(f"RCPT TO:{r}\r\n".encode())
             await writer.drain()
             await read_response(reader)
+        if Type == 2: 
+            message = read_response(reader)
+            return sent, Type, message
         
         writer.write(b"DATA\r\n")
         await writer.drain()
         await read_response(reader)
+        message = read_response(reader)
         
         writer.write(plain_message.encode() + b"\r\n.\r\n")
         await writer.drain()
         await read_response(reader)
+        message = read_response(reader)
         
         writer.write(b"QUIT\r\n")
         await writer.drain()
         await read_response(reader)
+        message = read_response(reader)
         
         logging.info("Correo enviado correctamente.")
         sent = True
@@ -98,7 +108,7 @@ async def send_email(sender, password, recipients, subject, message, extra_heade
         if writer:
             writer.close()
             await writer.wait_closed()
-        return sent, Type
+        return sent, Type, message
 
 
 if __name__ == "__main__":
@@ -151,17 +161,17 @@ if __name__ == "__main__":
     SMTP_PORT = args.port
 
     try:
-        result, Type = asyncio.run(send_email(args.from_mail, args.password,
+        result, Type, message = asyncio.run(send_email(args.from_mail, args.password,
                                           recipients, subject, body,
                                           extra_headers, SMTP_SERVER, SMTP_PORT))
         if result:
-            output = {"status_code": 250, "message": "Correo enviado correctamente."}
+            output = {"status_code": 250, "message": message}
         else:
             if Type == 1:
-                output = {"status_code": 501, "message": "Dirección de correo inválida: Remitente"}
+                output = {"status_code": 501, "message": message}
             if Type == 2:
-                output = {"status_code": 550, "message": "Dirección de correo inválida: Argumentos del destinatario."}
+                output = {"status_code": 550, "message": {message}}
     except Exception as e:
-        output = {"status_code": 500, "message": f"Excepción: {e}"}
+        output = {"status_code": 500, "message": f"{message}: {e}"}
 
     print(json.dumps(output))
