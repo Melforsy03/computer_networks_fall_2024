@@ -72,33 +72,28 @@ async def send_email(sender, password, recipients, subject, message, extra_heade
 
         writer.write(f"MAIL FROM:{sender}\r\n".encode())
         await writer.drain()
-        await read_response(reader)
+        message = await read_response(reader)
         if Type == 1: 
-            message = read_response(reader)
             return sent, Type, message
         
         for r in recipients:
             writer.write(f"RCPT TO:{r}\r\n".encode())
             await writer.drain()
-            await read_response(reader)
+            message = await read_response(reader)
         if Type == 2: 
-            message = read_response(reader)
             return sent, Type, message
         
         writer.write(b"DATA\r\n")
         await writer.drain()
-        await read_response(reader)
-        message = read_response(reader)
+        message = await read_response(reader)
         
         writer.write(plain_message.encode() + b"\r\n.\r\n")
         await writer.drain()
-        await read_response(reader)
-        message = read_response(reader)
+        message = await read_response(reader)
         
         writer.write(b"QUIT\r\n")
         await writer.drain()
-        await read_response(reader)
-        message = read_response(reader)
+        message = await read_response(reader)
         
         logging.info("Correo enviado correctamente.")
         sent = True
