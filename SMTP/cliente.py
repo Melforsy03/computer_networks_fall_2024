@@ -20,42 +20,41 @@ async def read_response(reader):
     response = await reader.read(1024)
     response_decoded = response.decode().strip()
     logging.debug(f"Respuesta del servidor: {response_decoded}")
-    if not (response_decoded.startswith("2") or response_decoded.startswith("3")):
-        raise Exception(f"Error del servidor: {response_decoded}")
+    codigo = response_decoded[:3]
+    if not (codigo.startswith("2") or codigo.startswith("3")):
+        raise Exception(json.dumps({"status_code": int(codigo), "message": response_decoded}))
     return response_decoded
 
 async def send_email(sender, password, recipients, subject, message, extra_headers,
                      smtp_server=DEFAULT_SMTP_SERVER, smtp_port=DEFAULT_SMTP_PORT):
     logging.info("Iniciando envío de correo.")
-    Type = 0
     sent = False
-    if not validate_email(sender):
-        return sent,1
-    
-    if isinstance(recipients, str):
-        recipients = [r.strip() for r in recipients.split(",") if r.strip()]
-    for r in recipients:
-        if not validate_email(r):
-            return sent,2
-    
-    headers = f"From: {sender}\r\n"
-    headers += f"To: {', '.join(recipients)}\r\n"
-    headers += f"Subject: {subject}\r\n"
-    headers += f"Date: {formatdate(localtime=True)}\r\n"
-    for key, value in extra_headers.items():
-        headers += f"{key}: {value}\r\n"
-    headers += "\r\n"
-    
-    plain_message = headers + message
-    reader, writer = None, None
     try:
+        if not validate_email(sender):
+            return False, {"status_code": 501, "message": "Invalid sender address"}
+    
+        if isinstance(recipients, str):
+            recipients = [r.strip() for r in recipients.split(",") if r.strip()]
+        for r in recipients:
+            if not validate_email(r):
+                return False, {"status_code": 550, "message": "Invalid recipient address"}
+    
+        headers = f"From: {sender}\r\n"
+        headers += f"To: {', '.join(recipients)}\r\n"
+        headers += f"Subject: {subject}\r\n"
+        headers += f"Date: {formatdate(localtime=True)}\r\n"
+        for key, value in extra_headers.items():
+            headers += f"{key}: {value}\r\n"
+        headers += "\r\n"
+    
+        plain_message = headers + message
         reader, writer = await asyncio.open_connection(smtp_server, smtp_port)
         await read_response(reader)
-        
+    
         writer.write(b"EHLO localhost\r\n")
         await writer.drain()
         await read_response(reader)
-        
+    
         try:
             auth_str = "\0" + sender + "\0" + password
             auth_b64 = base64.b64encode(auth_str.encode())
@@ -67,37 +66,43 @@ async def send_email(sender, password, recipients, subject, message, extra_heade
                 logging.warning("El servidor no implementa AUTH; se continúa sin autenticación.")
             else:
                 raise e
-
+    
         writer.write(f"MAIL FROM:{sender}\r\n".encode())
         await writer.drain()
         await read_response(reader)
-        
+    
         for r in recipients:
             writer.write(f"RCPT TO:{r}\r\n".encode())
             await writer.drain()
             await read_response(reader)
-        
+    
         writer.write(b"DATA\r\n")
         await writer.drain()
         await read_response(reader)
-        
+    
         writer.write(plain_message.encode() + b"\r\n.\r\n")
         await writer.drain()
         await read_response(reader)
-        
+    
         writer.write(b"QUIT\r\n")
         await writer.drain()
         await read_response(reader)
-        
+    
         logging.info("Correo enviado correctamente.")
         sent = True
+        return sent, {"status_code": 250, "message": "Message accepted for delivery"}
+    
     except Exception as e:
         logging.error(f"Error al enviar el correo: {e}")
+        try:
+            error_info = json.loads(str(e).replace("Error del servidor: ", ""))
+        except:
+            error_info = {"status_code": 500, "message": str(e)}
+        return False, error_info
     finally:
         if writer:
             writer.close()
             await writer.wait_closed()
-        return sent, Type
 
 
 if __name__ == "__main__":
@@ -150,16 +155,13 @@ if __name__ == "__main__":
     SMTP_PORT = args.port
 
     try:
-        result, Type = asyncio.run(send_email(args.from_mail, args.password,
+        result, error_info = asyncio.run(send_email(args.from_mail, args.password,
                                           recipients, subject, body,
                                           extra_headers, SMTP_SERVER, SMTP_PORT))
         if result:
             output = {"status_code": 250, "message": "Message accepted for delivery"}
         else:
-            if Type == 1:
-                output = {"status_code": 501, "message": "Invalid sender address"}
-            if Type == 2:
-                output = {"status_code": 550, "message": "Invalid recipient address"}
+            output = error_info
     except Exception as e:
         output = {"status_code": 500, "message": f"Excepción: {e}"}
 
