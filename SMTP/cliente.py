@@ -93,11 +93,10 @@ async def send_email(sender, password, recipients, subject, message,
     #if extra_headers:
     #    headers += extra_headers + "\n"
 
-    if use_header_command:
-        encrypted_body = cipher_suite.encrypt(message.encode())
-    else:
-        full_message = headers + "\n" + message
-        encrypted_body = cipher_suite.encrypt(full_message.encode())
+    #if use_header_command:
+    #    encrypted_body = cipher_suite.encrypt(message.encode())
+    full_message = headers + "\n" + message
+    encrypted_body = cipher_suite.encrypt(full_message.encode())
 
     ssl_context = ssl.create_default_context()
     ssl_context.load_verify_locations("server.crt")
