@@ -165,10 +165,10 @@ if __name__ == "__main__":
                                           recipients, subject, body,
                                           extra_headers, SMTP_SERVER, SMTP_PORT))
         if result:
-            output = {"status_code": 250, "message": message}
+            output = {"status_code": 250, "message":  {message}}
         else:
             if Type == 1:
-                output = {"status_code": 501, "message": message}
+                output = {"status_code": 501, "message":  {message}}
             if Type == 2:
                 output = {"status_code": 550, "message": {message}}
     except Exception as e:
