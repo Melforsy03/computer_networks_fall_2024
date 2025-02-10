@@ -157,9 +157,9 @@ if __name__ == "__main__":
             output = {"status_code": 250, "message": "Message accepted for delivery"}
         else:
             if Type == 1:
-                output = {"status_code": 501, "message": "Dirección de correo inválida: Remitente"}
+                output = {"status_code": 501, "message": "Invalid sender address"}
             if Type == 2:
-                output = {"status_code": 550, "message": "Dirección de correo inválida: Argumentos del destinatario."}
+                output = {"status_code": 550, "message": "Invalid recipient address"}
     except Exception as e:
         output = {"status_code": 500, "message": f"Excepción: {e}"}
 
