@@ -67,12 +67,12 @@ async def send_email(sender, password, recipients, subject, message, extra_heade
             else:
                 raise e
 
-        writer.write(f"MAIL FROM:<{sender}>\r\n".encode())
+        writer.write(f"MAIL FROM:{sender}\r\n".encode())
         await writer.drain()
         await read_response(reader)
         
         for r in recipients:
-            writer.write(f"RCPT TO:<{r}>\r\n".encode())
+            writer.write(f"RCPT TO:{r}\r\n".encode())
             await writer.drain()
             await read_response(reader)
         
