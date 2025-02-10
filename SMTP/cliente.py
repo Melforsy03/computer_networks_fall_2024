@@ -14,8 +14,7 @@ DEFAULT_SMTP_PORT = 2525
 
 def validate_email(email):
     email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-    if not re.match(email_regex, email):
-        raise ValueError(f"Dirección de correo inválida: {email}")
+    return bool(re.match(email_regex, email))
 
 async def read_response(reader):
     response = await reader.read(1024)
@@ -28,12 +27,16 @@ async def read_response(reader):
 async def send_email(sender, password, recipients, subject, message, extra_headers,
                      smtp_server=DEFAULT_SMTP_SERVER, smtp_port=DEFAULT_SMTP_PORT):
     logging.info("Iniciando envío de correo.")
-    validate_email(sender)
+    Type = 0
+    sent = False
+    if not validate_email(sender):
+        return sent,1
     
     if isinstance(recipients, str):
         recipients = [r.strip() for r in recipients.split(",") if r.strip()]
     for r in recipients:
-        validate_email(r)
+        if not validate_email(r):
+            return sent,2
     
     headers = f"From: {sender}\r\n"
     headers += f"To: {', '.join(recipients)}\r\n"
@@ -44,9 +47,8 @@ async def send_email(sender, password, recipients, subject, message, extra_heade
     headers += "\r\n"
     
     plain_message = headers + message
-
     reader, writer = None, None
-    sent = False
+    
     try:
         reader, writer = await asyncio.open_connection(smtp_server, smtp_port)
         await read_response(reader)
@@ -96,7 +98,7 @@ async def send_email(sender, password, recipients, subject, message, extra_heade
         if writer:
             writer.close()
             await writer.wait_closed()
-        return sent
+        return sent, Type
 
 
 if __name__ == "__main__":
@@ -149,13 +151,16 @@ if __name__ == "__main__":
     SMTP_PORT = args.port
 
     try:
-        result = asyncio.run(send_email(args.from_mail, args.password,
+        result, Type = asyncio.run(send_email(args.from_mail, args.password,
                                           recipients, subject, body,
                                           extra_headers, SMTP_SERVER, SMTP_PORT))
         if result:
             output = {"status_code": 250, "message": "Correo enviado correctamente."}
         else:
-            output = {"status_code": 500, "message": "Error al enviar el correo."}
+            if Type == 1:
+                output = {"status_code": 501, "message": "Dirección de correo inválida: Remitente"}
+            if Type == 2:
+                output = {"status_code": 550, "message": "Dirección de correo inválida: Argumentos del destinatario."}
     except Exception as e:
         output = {"status_code": 500, "message": f"Excepción: {e}"}
 
