@@ -153,7 +153,7 @@ if __name__ == "__main__":
                                           recipients, subject, body,
                                           extra_headers, SMTP_SERVER, SMTP_PORT))
         if result:
-            output = {"status_code": 333, "message": "Correo enviado correctamente."}
+            output = {"status_code": 250, "message": "Correo enviado correctamente."}
         else:
             output = {"status_code": 500, "message": "Error al enviar el correo."}
     except Exception as e:
