@@ -236,8 +236,8 @@ if __name__ == "__main__":
     parser.add_argument("-u", "--host", type=str, required=True, help="Host SMTP.")
     parser.add_argument("-f", "--from_mail", type=str, required=True, help="Correo del remitente.")
     parser.add_argument("-t", "--to_mail", type=str, required=True, help="Lista de correos destinatarios en formato JSON.")
-    parser.add_argument("-s", "--subject", type=str, required=True, help="Asunto del correo.")
-    parser.add_argument("-b", "--body", type=str, required=True, help="Cuerpo del correo.")
+    parser.add_argument("-s", "--subject", type=str, required=True, help="Asunto del correo.", nargs="+")
+    parser.add_argument("-b", "--body", type=str, required=True, help="Cuerpo del correo.", nargs="+")
     parser.add_argument("-h", "--header", type=str, default="{}", help="Encabezados adicionales en formato JSON.")
     parser.add_argument("-P", "--password", type=str, default="default", help="Contraseña del remitente")
     # Agregamos manualmente la opción de ayuda
@@ -245,6 +245,9 @@ if __name__ == "__main__":
                         help="Muestra este mensaje de ayuda y sale.")
 
     args = parser.parse_args()
+
+    subject = " ".join(args.subject)
+    body = " ".join(args.body)
 
     # Parsear el parámetro to_mail (convertir de cadena JSON a lista)
     try:
@@ -269,7 +272,7 @@ if __name__ == "__main__":
 
     try:
         result = asyncio.run(send_email(args.from_mail, args.password,
-                                          recipients, args.subject, args.body,
+                                          recipients, subject, body,
                                           extra_headers, SMTP_SERVER, SMTP_PORT))
         if result:
             output = {"status_code": 333, "message": "Correo enviado correctamente."}
